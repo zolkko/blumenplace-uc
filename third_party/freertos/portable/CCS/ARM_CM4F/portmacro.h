@@ -111,6 +111,11 @@ typedef unsigned long UBaseType_t;
  */
 #define portMEMORY_BARRIER()						__asm("\n dsb\n isb\n")
 
+/**
+ * Request PENDSV interrupt.
+ */
+#define portREQUEST_PENDSV()						portNVIC_INT_CTRL_REG = portNVIC_PENDSVSET_BIT
+
 
 /**
  * Scheduler utilities

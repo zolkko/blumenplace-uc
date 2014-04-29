@@ -63,7 +63,6 @@
     1 tab == 4 spaces!
 */
 
-/* Scheduler includes. */
 #include "FreeRTOS.h"
 #include "task.h"
 
@@ -161,14 +160,16 @@ extern void vPortEnableVFP( void );
  */
 static void prvTaskExitError( void );
 
-/*
+/**
  * See header file for description.
+ *
+ * Simulate the stack frame as it would be created by a context switch interrupt.
+ *
+ * Offset added to account for the way the MCU uses the stack on entry/exit of
+ * interrupts, and to ensure alignment.
  */
-StackType_t *pxPortInitialiseStack( StackType_t *pxTopOfStack, TaskFunction_t pxCode, void *pvParameters )
+StackType_t *pxPortInitialiseStack( StackType_t *pxTopOfStack, TaskFunction_t pxCode, void *pvParameters)
 {
-	/* Simulate the stack frame as it would be created by a context switch interrupt. */
-
-	/* Offset added to account for the way the MCU uses the stack on entry/exit of interrupts, and to ensure alignment. */
 	pxTopOfStack--;
 
 	*pxTopOfStack = portINITIAL_XPSR;	    /* xPSR */
@@ -190,18 +191,19 @@ StackType_t *pxPortInitialiseStack( StackType_t *pxTopOfStack, TaskFunction_t px
 	return pxTopOfStack;
 }
 
-
+/**
+ * A function that implements a task must not exit or attempt to return to
+ * its caller as there is nothing to return to.  If a task wants to exit it
+ * should instead call vTaskDelete( NULL ).
+ *
+ * Artificially force an assert() to be triggered if configASSERT() is
+ * defined, then stop here so application writers can catch the error.
+ */
 static void prvTaskExitError( void )
 {
-	/* A function that implements a task must not exit or attempt to return to
-	its caller as there is nothing to return to.  If a task wants to exit it
-	should instead call vTaskDelete( NULL ).
-
-	Artificially force an assert() to be triggered if configASSERT() is
-	defined, then stop here so application writers can catch the error. */
-	configASSERT( uxCriticalNesting == ~0UL );
+	configASSERT(uxCriticalNesting == ~0UL);
 	portDISABLE_INTERRUPTS();
-	for( ;; );
+	for (;;);
 }
 
 /*
@@ -211,14 +213,11 @@ BaseType_t xPortStartScheduler( void )
 {
 	/* configMAX_SYSCALL_INTERRUPT_PRIORITY must not be set to 0.
 	See http://www.FreeRTOS.org/RTOS-Cortex-M3-M4.html */
-	configASSERT( configMAX_SYSCALL_INTERRUPT_PRIORITY );
+	configASSERT(configMAX_SYSCALL_INTERRUPT_PRIORITY);
 
 	/* Make PendSV and SysTick the lowest priority interrupts. */
-	portNVIC_SYSPRI2_REG |= portNVIC_PENDSV_PRI;
-	portNVIC_SYSPRI2_REG |= portNVIC_SYSTICK_PRI;
+	portNVIC_SYSPRI2_REG |= portNVIC_PENDSV_PRI | portNVIC_SYSTICK_PRI;
 
-	/* Start the timer that generates the tick ISR.  Interrupts are disabled
-	here already. */
 	vPortSetupTimerInterrupt();
 
 	/* Initialize the critical nesting count ready for the first task. */
@@ -228,9 +227,8 @@ BaseType_t xPortStartScheduler( void )
 	vPortEnableVFP();
 
 	/* Lazy save always. */
-	*( portFPCCR ) |= portASPEN_AND_LSPEN_BITS;
+	*(portFPCCR) |= portASPEN_AND_LSPEN_BITS;
 
-	/* Start the first task. */
 	vPortStartFirstTask();
 
 	/* Should never get here as the tasks will now be executing!  Call the task
@@ -243,21 +241,20 @@ BaseType_t xPortStartScheduler( void )
 }
 
 
-void vPortEndScheduler( void )
+void vPortEndScheduler(void)
 {
 	configASSERT(uxCriticalNesting == 1000UL);
 }
 
 
-void vPortYield( void )
+void vPortYield(void)
 {
-	/* Set a PendSV to request a context switch. */
-	portNVIC_INT_CTRL_REG = portNVIC_PENDSVSET_BIT;
+	portREQUEST_PENDSV();
 	portMEMORY_BARRIER();
 }
 
 
-void vPortEnterCritical( void )
+void vPortEnterCritical(void)
 {
 	portDISABLE_INTERRUPTS();
 	uxCriticalNesting++;
@@ -275,33 +272,29 @@ void vPortExitCritical( void )
 	}
 }
 
-
 /**
  * The SysTick runs at the lowest interrupt priority, so when this interrupt
  * executes all interrupts must be unmasked.  There is therefore no need to
  * save and then restore the interrupt mask value as its value is already known.
  */
-void xPortSysTickHandler( void )
+void xPortSysTickHandler(void)
 {
 	portSET_INTERRUPT_MASK_FROM_ISR();
 	{
-		/* Increment the RTOS tick. */
 		if (pdFALSE != xTaskIncrementTick())
 		{
-			/* A context switch is required.  Context switching is performed in the PendSV interrupt.  Pend the PendSV interrupt. */
-			portNVIC_INT_CTRL_REG = portNVIC_PENDSVSET_BIT;
+			portREQUEST_PENDSV();
 		}
 	}
 	portCLEAR_INTERRUPT_MASK_FROM_ISR(0);
 }
 
-
-/*
+/**
  * Setup the systick timer to generate the tick interrupts at the required
  * frequency.
  */
 void vPortSetupTimerInterrupt( void )
 {
-	portNVIC_SYSTICK_LOAD_REG = ( configSYSTICK_CLOCK_HZ / configTICK_RATE_HZ ) - 1UL;
-	portNVIC_SYSTICK_CTRL_REG = ( portNVIC_SYSTICK_CLK_BIT | portNVIC_SYSTICK_INT_BIT | portNVIC_SYSTICK_ENABLE_BIT );
+	portNVIC_SYSTICK_LOAD_REG = (configSYSTICK_CLOCK_HZ / configTICK_RATE_HZ) - 1UL;
+	portNVIC_SYSTICK_CTRL_REG = portNVIC_SYSTICK_CLK_BIT | portNVIC_SYSTICK_INT_BIT | portNVIC_SYSTICK_ENABLE_BIT;
 }
