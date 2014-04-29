@@ -209,7 +209,8 @@ void (* const g_pfnVectors[])(void) =
  */
 void reset_isr_handler(void)
 {
-	// TODO: call sys lib
+	__asm(" .global _c_int00\n"
+		  " b.w     _c_int00");
 }
 
 
