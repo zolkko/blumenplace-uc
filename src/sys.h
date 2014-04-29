@@ -1,8 +1,14 @@
-#ifndef SYS_H_
-#define SYS_H_
+#ifndef __sys_h__
+#define __sys_h__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-void init_sys(void);
+void sys_init(void);
 
+#ifdef __cplusplus
+}
+#endif
 
-#endif /* SYS_H_ */
+#endif /* __sys_h__ */

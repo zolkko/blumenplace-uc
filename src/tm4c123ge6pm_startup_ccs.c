@@ -1,15 +1,12 @@
 #include <stdint.h>
 
-
-void reset_isr_handler(void);
+/**
+ * System interrupt handlers
+ */
+static void reset_isr_handler(void);
 static void nm_isr_handler(void);
 static void fault_isr_handler(void);
 static void default_isr_handler(void);
-
-#define timer0a_isr_handler default_isr_handler
-#pragma WEAK(timer0a_isr_handler);
-extern void timer0a_isr_handler(void);
-
 
 /**
  * Import from FreeRTOS port
@@ -19,28 +16,32 @@ extern void vPortSVCHandler(void);
 extern void xPortSysTickHandler(void);
 
 
-//*****************************************************************************
-//
-// External declaration for the reset handler that is to be called when the
-// processor is started
-//
-//*****************************************************************************
+#define DEFINE_DEF_ISR(X)		__attribute__((weak)) void X(void) { default_isr_handler(); }
+
+
+/**
+ * Externally defined interrupts
+ */
+DEFINE_DEF_ISR(timer0a_isr_handler)
+
+
+/**
+ * External declaration for the reset handler that is to be called when the
+ * processor is started
+ */
 extern void _c_int00(void);
 
-//*****************************************************************************
-//
-// Linker variable that marks the top of the stack.
-//
-//*****************************************************************************
+/**
+ * Linker variable that marks the top of the stack.
+ */
 extern uint32_t __STACK_TOP;
 
-//*****************************************************************************
-//
-// The vector table.  Note that the proper constructs must be placed on this to
-// ensure that it ends up at physical address 0x0000.0000 or at the start of
-// the program if located at a start address other than 0.
-//
-//*****************************************************************************
+/**
+ *
+ * The vector table.  Note that the proper constructs must be placed on this to
+ * ensure that it ends up at physical address 0x0000.0000 or at the start of
+ * the program if located at a start address other than 0.
+ */
 #pragma DATA_SECTION(g_pfnVectors, ".intvecs")
 void (* const g_pfnVectors[])(void) =
 {
@@ -210,25 +211,25 @@ void (* const g_pfnVectors[])(void) =
 void reset_isr_handler(void)
 {
 	__asm(" .global _c_int00\n"
-		  " b.w     _c_int00");
+		  "  b.w     _c_int00");
 }
 
 
-static void nm_isr_handler(void)
+void nm_isr_handler(void)
 {
     while (1) {
     }
 }
 
 
-static void fault_isr_handler(void)
+void fault_isr_handler(void)
 {
     while (1) {
     }
 }
 
 
-static void default_isr_handler(void)
+void default_isr_handler(void)
 {
     while (1) {
     }
