@@ -9,8 +9,10 @@
 #include <driverlib/sysctl.h>
 #include <driverlib/interrupt.h>
 #include <driverlib/timer.h>
+#include <driverlib/udma.h>
 
 #include "sht1x.h"
+#include "hw_udma_tbl.h"
 
 
 void timer0a_isr_handler(void)
@@ -37,8 +39,19 @@ void init_timer0a(void)
 }
 
 
+void udma_init(void)
+{
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_UDMA);
+    // SysCtlPeripheralSleepEnable(SYSCTL_PERIPH_UDMA);
+    // IntEnable(INT_UDMAERR);
+    uDMAEnable();
+    uDMAControlBaseSet(UDMA_CTL_TBL);
+}
+
+
 bool sht1x_init(sht1x_t * self)
 {
+	udma_init();
 	init_timer0a();
 	return true;
 }

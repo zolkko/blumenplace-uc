@@ -7,6 +7,7 @@
 
 #include "sys.h"
 #include "main_task.h"
+#include "sht1x.h"
 
 
 void second_task(void * params)
