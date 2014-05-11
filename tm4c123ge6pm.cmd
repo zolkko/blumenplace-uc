@@ -26,20 +26,22 @@ MEMORY
 
 /* Section allocation in memory */
 
+
 SECTIONS
 {
-    .intvecs:   > 0x00000000
-    .text   :   > FLASH
-    .const  :   > FLASH
-    .cinit  :   > FLASH
-    .pinit  :   > FLASH
-    .init_array : > FLASH
+	.intvecs:   > 0x00000000
+	.text   :   > FLASH
+	.const  :   > FLASH
+	.cinit  :   > FLASH
+	.pinit  :   > FLASH
+	.init_array : > FLASH
 
-    .vtable :   > 0x20000000
-    .data   :   > SRAM
-    .bss    :   > SRAM
-    .sysmem :   > SRAM
-    .stack  :   > SRAM
+	.vtable :   > 0x20000000
+	.data   :   > SRAM
+	.bss    :   > SRAM
+	.sysmem :   > SRAM
+
+	.stack  :   > SRAM (HIGH)
 }
 
-__STACK_TOP = __stack + 512;
+__STACK_TOP = __stack + __STACK_SIZE;

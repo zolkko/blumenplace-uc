@@ -1,23 +1,22 @@
 
-#include <stdbool.h>
 #include <stdint.h>
+#include <stdbool.h>
+#include <stdio.h>
 
 #include "main_task.h"
+
+#include "sht1x.h"
 
 
 void main_task(void * params)
 {
-	int i = 0;
+	sht1x_init();
+
 	while (true) {
-		if (i > 1000) {
-			i = 0;
+		if (sht1x_read_temperature()) {
+			printf("Temperature read succeed\n");
+		} else {
+			printf("Temperature read failed\n");
 		}
-		i++;
 	}
-}
-
-
-uint32_t test_func(void)
-{
-	return 0UL;
 }

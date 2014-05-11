@@ -7,17 +7,9 @@
 extern "C" {
 #endif
 
-typedef struct sh1x {
-	void * priv;
-	uint8_t	(*read_temperature)	(const struct sh1x * self);
-	uint8_t	(*read_moisture)	(const struct sh1x * self);
-	void	(*set_status)		(const struct sh1x * self);
-	uint8_t	(*get_status)		(const struct sh1x * self);
-} sht1x_t;
+void sht1x_init(void);
 
-
-bool sht1x_init(sht1x_t * self);
-
+uint8_t sht1x_read_temperature(void);
 
 #ifdef __cplusplus
 }

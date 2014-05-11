@@ -16,13 +16,16 @@ extern void vPortSVCHandler(void);
 extern void xPortSysTickHandler(void);
 
 
-#define DEFINE_DEF_ISR(X)		__attribute__((weak)) void X(void) { default_isr_handler(); }
+#define DEFINE_ISR(X)			__attribute__((weak)) void X(void) { default_isr_handler(); }
 
 
 /**
  * Externally defined interrupts
  */
-DEFINE_DEF_ISR(timer0a_isr_handler)
+DEFINE_ISR(timer0a_isr_handler)
+DEFINE_ISR(udma_software_isr_handler)
+DEFINE_ISR(udma_error_isr_handler)
+DEFINE_ISR(gpioe_isr_handler)
 
 
 /**
@@ -66,7 +69,7 @@ void (* const g_pfnVectors[])(void) =
     default_isr_handler,                    // GPIO Port B
     default_isr_handler,                    // GPIO Port C
     default_isr_handler,                    // GPIO Port D
-    default_isr_handler,                    // GPIO Port E
+    gpioe_isr_handler,                      // GPIO Port E
     default_isr_handler,                    // UART0 Rx and Tx
     default_isr_handler,                    // UART1 Rx and Tx
     default_isr_handler,                    // SSI0 Rx and Tx
@@ -108,8 +111,8 @@ void (* const g_pfnVectors[])(void) =
     default_isr_handler,                    // Hibernate
     default_isr_handler,                    // USB0
     default_isr_handler,                    // PWM Generator 3
-    default_isr_handler,                    // uDMA Software Transfer
-    default_isr_handler,                    // uDMA Error
+    udma_software_isr_handler,              // uDMA Software Transfer
+    udma_error_isr_handler,                 // uDMA Error
     default_isr_handler,                    // ADC1 Sequence 0
     default_isr_handler,                    // ADC1 Sequence 1
     default_isr_handler,                    // ADC1 Sequence 2
