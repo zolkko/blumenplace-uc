@@ -13,10 +13,10 @@ void main_task(void * params)
 	sht1x_init();
 
 	while (true) {
-		if (sht1x_read_status()) {
-			printf("Status read succeed\n");
+		if (sht1x_status_write(0x00) == SHT1X_ERROR_OK) {
+			printf("Status write succeed\n");
 		} else {
-			printf("Status read failed\n");
+			printf("Status write failed\n");
 		}
 	}
 }

@@ -15,10 +15,20 @@ extern "C" {
 #define SHT1X_SREG_HEATER_bm		(1 << 2)	/* heater - default off */
 #define SHT1X_SREG_LOW_VOLTAGE_bm	(1 << 6)	/* 0 for VDD > 2.47, 1 for VDD < 2.47 */
 
+typedef enum {
+	SHT1X_ERROR_OK,
+	SHT1X_ERROR_CMD,
+	SHT1X_ERROR_NO_CMD_ACK,
+	SHT1X_ERROR_MEASUREMENT_TIMEOUT,
+	SHT1X_ERROR_INVALID_STATE,
+	SHT1X_ERROR_UNKNOWN
+} sht1x_error_t;
 
 void sht1x_init(void);
 
 uint8_t sht1x_read_status(void);
+
+sht1x_error_t sht1x_status_write(uint8_t status);
 
 uint8_t sht1x_read_temperature(void);
 

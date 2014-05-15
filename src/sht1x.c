@@ -3,7 +3,7 @@
  */
 #include <stdint.h>
 #include <stdbool.h>
-#include <stdio.h>
+#include <stdlib.h>
 
 #include <inc/tm4c123gh6pm.h>
 #include <inc/hw_memmap.h>
@@ -164,7 +164,6 @@ typedef enum {
 
 	SHT1X_SIDX_FAIL = 62,
 
-	SHT1X_SIDX_RS_TS,
 	SHT1X_SIDX_RS,
 	SHT1X_SIDX_RS_ACK,
 	SHT1X_SIDX_RS_ACKC,
@@ -190,17 +189,29 @@ typedef enum {
 	SHT1X_SIDX_RSD_ACK,
 	SHT1X_SIDX_RSD_ACKC,
 
+	SHT1X_SIDX_RS_CRC_7,
+	SHT1X_SIDX_RS_CRC_7C,
+	SHT1X_SIDX_RS_CRC_6,
+	SHT1X_SIDX_RS_CRC_6C,
+	SHT1X_SIDX_RS_CRC_5,
+	SHT1X_SIDX_RS_CRC_5C,
+	SHT1X_SIDX_RS_CRC_4,
+	SHT1X_SIDX_RS_CRC_4C,
+	SHT1X_SIDX_RS_CRC_3,
+	SHT1X_SIDX_RS_CRC_3C,
+	SHT1X_SIDX_RS_CRC_2,
+	SHT1X_SIDX_RS_CRC_2C,
+	SHT1X_SIDX_RS_CRC_1,
+	SHT1X_SIDX_RS_CRC_1C,
+	SHT1X_SIDX_RS_CRC_0,
+	SHT1X_SIDX_RS_CRC_0C,
+
+	SHT1X_SIDX_RS_CRC_ACKS,
+	SHT1X_SIDX_RS_CRC_ACK,
+	SHT1X_SIDX_RS_CRC_ACKC,
+
+	SHT1X_SIDX_SREG_WRITE,
 } sht1x_sidx_t;
-
-
-typedef enum {
-	SHT1X_ERROR_OK,
-	SHT1X_ERROR_CMD,
-	SHT1X_ERROR_NO_CMD_ACK,
-	SHT1X_ERROR_MEASUREMENT_TIMEOUT,
-	SHT1X_ERROR_INVALID_STATE,
-	SHT1X_ERROR_UNKNOWN
-} sht1x_error_t;
 
 /**
  * Types of output which a state produces.
@@ -212,10 +223,11 @@ typedef enum {
 	SHT1X_SOUT_CRC = (1 << 3),
 	SHT1X_SOUT_TSPEED = (1 << 4),
 	SHT1X_SOUT_TSTOP = (1 << 5),
-	SHT1X_SOUT_ISTART = (1 << 6),
-	SHT1X_SOUT_ISTOP = (1 << 7),
-	SHT1X_SOUT_DMA = (1 << 8),
-	SHT1X_SOUT_DONE= (1 << 9)
+	SHT1X_SOUT_TSTART = (1 << 6),
+	SHT1X_SOUT_ISTART = (1 << 7),
+	SHT1X_SOUT_ISTOP = (1 << 8),
+	SHT1X_SOUT_DMA = (1 << 9),
+	SHT1X_SOUT_DONE= (1 << 10)
 } sht1x_sout_t;
 
 
@@ -225,6 +237,8 @@ typedef struct {
 
 	uint16_t data;
 	uint8_t crc;
+
+	uint8_t output_data[255];
 } sht1x_device_t;
 
 
@@ -240,32 +254,6 @@ typedef struct {
 	sht1x_sidx_t next_state[2];
 	sht1x_error_t next_error[2];
 } sht1x_state_t;
-
-/**
- * The bit pattern for "Measure Temperature" command.
- * 0x00011
- */
-static uint8_t measure_temperature_cmd[] = {
-	/* command 00011 */
-	0x00, SHT1X_CLOCK_PIN, /* c4 */
-	0x00, SHT1X_CLOCK_PIN, /* c3 */
-	0x00, SHT1X_CLOCK_PIN, /* c2 */
-	SHT1X_DATA_OUT_PIN, SHT1X_DATA_OUT_PIN | SHT1X_CLOCK_PIN, /* c1 */
-	SHT1X_DATA_OUT_PIN, SHT1X_DATA_OUT_PIN | SHT1X_CLOCK_PIN, /* c0 */
-};
-
-/**
- * The bit pattern for "Measure Relative Humidity" command.
- * 0x00101
- */
-static uint8_t measure_moisture_cmd[] = {
-	/* command 00101 */
-	0x00, SHT1X_CLOCK_PIN, /* c4 */
-	0x00, SHT1X_CLOCK_PIN, /* c3 */
-	0x00, SHT1X_CLOCK_PIN, /* c2 */
-	SHT1X_DATA_OUT_PIN, SHT1X_DATA_OUT_PIN | SHT1X_CLOCK_PIN, /* c1 */
-	SHT1X_DATA_OUT_PIN, SHT1X_DATA_OUT_PIN | SHT1X_CLOCK_PIN, /* c0 */
-};
 
 /**
  * Transmission start and Register address sequence pattern
@@ -296,11 +284,34 @@ static uint8_t trans_start_pattern[] = {
 };
 
 /**
+ * The bit pattern for "Measure Temperature" command.
+ * 0x00011
+ */
+static uint8_t measure_temperature_cmd[] = {
+	0x00, SHT1X_CLOCK_PIN, /* c4 */
+	0x00, SHT1X_CLOCK_PIN, /* c3 */
+	0x00, SHT1X_CLOCK_PIN, /* c2 */
+	SHT1X_DATA_OUT_PIN, SHT1X_DATA_OUT_PIN | SHT1X_CLOCK_PIN, /* c1 */
+	SHT1X_DATA_OUT_PIN, SHT1X_DATA_OUT_PIN | SHT1X_CLOCK_PIN, /* c0 */
+};
+
+/**
+ * The bit pattern for "Measure Relative Humidity" command.
+ * 0x00101
+ */
+static uint8_t measure_moisture_cmd[] = {
+	0x00, SHT1X_CLOCK_PIN, /* c4 */
+	0x00, SHT1X_CLOCK_PIN, /* c3 */
+	0x00, SHT1X_CLOCK_PIN, /* c2 */
+	SHT1X_DATA_OUT_PIN, SHT1X_DATA_OUT_PIN | SHT1X_CLOCK_PIN, /* c1 */
+	SHT1X_DATA_OUT_PIN, SHT1X_DATA_OUT_PIN | SHT1X_CLOCK_PIN, /* c0 */
+};
+
+/**
  * The bit pattern for "Status Register Read" command.
  * 0b00111
  */
 static uint8_t sreg_read_pattern[] = {
-	/* command 00111 */
 	0x00, SHT1X_CLOCK_PIN, /* c4 */
 	0x00, SHT1X_CLOCK_PIN, /* c3 */
 	SHT1X_DATA_OUT_PIN, SHT1X_BOTH_PINS, /* c2 */
@@ -311,14 +322,18 @@ static uint8_t sreg_read_pattern[] = {
 /**
  * The bit pattern for "Status Register Read" command.
  * 0b00110
+ *
+ * The pattern does not contain HI part of the ack-clock on purpose.
  */
-static uint8_t status_register_write_cmd[] = {
-	/* command 00111 */
+static uint8_t sreg_write_pattern[] = {
+	/* command */
 	0x00, SHT1X_CLOCK_PIN, /* c4 */
 	0x00, SHT1X_CLOCK_PIN, /* c3 */
 	SHT1X_DATA_OUT_PIN, SHT1X_BOTH_PINS, /* c2 */
 	SHT1X_DATA_OUT_PIN, SHT1X_BOTH_PINS, /* c1 */
 	0x00, SHT1X_CLOCK_PIN, /* c0 */
+	/* ack */
+	SHT1X_DATA_OUT_PIN, 0x00
 };
 
 
@@ -399,9 +414,8 @@ static sht1x_state_t states[] = {
 	/* SHT1X_SIDX_FAIL */		{SHT1X_SOUT_GPIO | SHT1X_SOUT_TSTOP |
 								 SHT1X_SOUT_ISTOP | SHT1X_SOUT_DONE,	SHT1X_DATA_OUT_PIN,	0,				0,	NULL,	0,	{SHT1X_SIDX_FAIL, SHT1X_SIDX_FAIL}, {SHT1X_ERROR_UNKNOWN, SHT1X_ERROR_UNKNOWN}},
 
-	/* SHT1X_SIDX_RS_TS */		{SHT1X_SOUT_DMA,						0,					0,				0,	sreg_read_pattern, sizeof(sreg_read_pattern), {SHT1X_SIDX_RS, SHT1X_SIDX_RS}, {SHT1X_ERROR_OK, SHT1X_ERROR_OK}},
-	/* SHT1X_SIDX_RS */			{SHT1X_SOUT_NONE,						0,					0,				0,	NULL,	0,	{SHT1X_SIDX_RS_ACK, SHT1X_SIDX_RS_ACK}, {SHT1X_ERROR_OK, SHT1X_ERROR_OK}},
-	/* SHT1X_SIDX_RS_ACK */		{SHT1X_SOUT_GPIO,						SHT1X_DATA_OUT_PIN,	0,				0,	NULL,	0,	{SHT1X_SIDX_RS_ACKC, SHT1X_SIDX_RS_ACKC}, {SHT1X_ERROR_OK, SHT1X_ERROR_OK}},
+	/* SHT1X_SIDX_RS */			{SHT1X_SOUT_DMA,						0,					0,				0,	sreg_read_pattern, sizeof(sreg_read_pattern), {SHT1X_SIDX_RS_ACK, SHT1X_SIDX_RS_ACK}, {SHT1X_ERROR_OK, SHT1X_ERROR_OK}},
+	/* SHT1X_SIDX_RS_ACK */		{SHT1X_SOUT_GPIO | SHT1X_SOUT_TSTART,	SHT1X_DATA_OUT_PIN,	0,				0,	NULL,	0,	{SHT1X_SIDX_RS_ACKC, SHT1X_SIDX_RS_ACKC}, {SHT1X_ERROR_OK, SHT1X_ERROR_OK}},
 	/* SHT1X_SIDX_RS_ACKC */	{SHT1X_SOUT_GPIO,						SHT1X_BOTH_PINS,	0,				0,	NULL,	0,	{SHT1X_SIDX_RSD_7, SHT1X_SIDX_RSD_7}, {SHT1X_ERROR_OK, SHT1X_ERROR_NO_CMD_ACK}},
 
 	/* SHT1X_SIDX_RSD_7 */		{SHT1X_SOUT_GPIO,						SHT1X_DATA_OUT_PIN,	0,				0,	NULL,	0,	{SHT1X_SIDX_RSD_7C, SHT1X_SIDX_RSD_7C}, {SHT1X_ERROR_OK, SHT1X_ERROR_OK}},
@@ -423,7 +437,30 @@ static sht1x_state_t states[] = {
 
 	/* SHT1X_SIDX_RSD_ACKS */	{SHT1X_SOUT_GPIO,						SHT1X_DATA_OUT_PIN,	0,				0,	NULL,	0,	{SHT1X_SIDX_RSD_ACK, SHT1X_SIDX_RSD_ACK}, {SHT1X_ERROR_OK, SHT1X_ERROR_OK}},
 	/* SHT1X_SIDX_RSD_ACK */	{SHT1X_SOUT_GPIO,						0x00,				0,				0,	NULL,	0,	{SHT1X_SIDX_RSD_ACKC, SHT1X_SIDX_RSD_ACKC}, {SHT1X_ERROR_OK, SHT1X_ERROR_OK}},
-	/* SHT1X_SIDX_RSD_ACKC */	{SHT1X_SOUT_GPIO,						SHT1X_CLOCK_PIN,	0,				0,	NULL,	0,	{SHT1X_SIDX_END, SHT1X_SIDX_END}, {SHT1X_ERROR_OK, SHT1X_ERROR_OK}},
+	/* SHT1X_SIDX_RSD_ACKC */	{SHT1X_SOUT_GPIO,						SHT1X_CLOCK_PIN,	0,				0,	NULL,	0,	{SHT1X_SIDX_RS_CRC_7, SHT1X_SIDX_RS_CRC_7}, {SHT1X_ERROR_OK, SHT1X_ERROR_OK}},
+
+	/* SHT1X_SIDX_RS_CRC_7 */	{SHT1X_SOUT_GPIO,						SHT1X_DATA_OUT_PIN,	0,				0,	NULL,	0,	{SHT1X_SIDX_RS_CRC_7C, SHT1X_SIDX_RS_CRC_7C}, {SHT1X_ERROR_OK, SHT1X_ERROR_OK}},
+	/* SHT1X_SIDX_RS_CRC_7C */	{SHT1X_SOUT_GPIO | SHT1X_SOUT_CRC,		SHT1X_BOTH_PINS,	0,				7,	NULL,	0,	{SHT1X_SIDX_RS_CRC_6, SHT1X_SIDX_RS_CRC_6}, {SHT1X_ERROR_OK, SHT1X_ERROR_OK}},
+	/* SHT1X_SIDX_RS_CRC_6 */	{SHT1X_SOUT_GPIO,						SHT1X_DATA_OUT_PIN,	0,				0,	NULL,	0,	{SHT1X_SIDX_RS_CRC_6C, SHT1X_SIDX_RS_CRC_6C}, {SHT1X_ERROR_OK, SHT1X_ERROR_OK}},
+	/* SHT1X_SIDX_RS_CRC_6C */	{SHT1X_SOUT_GPIO | SHT1X_SOUT_CRC,		SHT1X_BOTH_PINS,	0,				6,	NULL,	0,	{SHT1X_SIDX_RS_CRC_5, SHT1X_SIDX_RS_CRC_5}, {SHT1X_ERROR_OK, SHT1X_ERROR_OK}},
+	/* SHT1X_SIDX_RS_CRC_5 */	{SHT1X_SOUT_GPIO,						SHT1X_DATA_OUT_PIN,	0,				0,	NULL,	0,	{SHT1X_SIDX_RS_CRC_5C, SHT1X_SIDX_RS_CRC_5C}, {SHT1X_ERROR_OK, SHT1X_ERROR_OK}},
+	/* SHT1X_SIDX_RS_CRC_5C */	{SHT1X_SOUT_GPIO | SHT1X_SOUT_CRC,		SHT1X_BOTH_PINS,	0,				5,	NULL,	0,	{SHT1X_SIDX_RS_CRC_4, SHT1X_SIDX_RS_CRC_4}, {SHT1X_ERROR_OK, SHT1X_ERROR_OK}},
+	/* SHT1X_SIDX_RS_CRC_4 */	{SHT1X_SOUT_GPIO,						SHT1X_DATA_OUT_PIN,	0,				0,	NULL,	0,	{SHT1X_SIDX_RS_CRC_4C, SHT1X_SIDX_RS_CRC_4C}, {SHT1X_ERROR_OK, SHT1X_ERROR_OK}},
+	/* SHT1X_SIDX_RS_CRC_4C */	{SHT1X_SOUT_GPIO | SHT1X_SOUT_CRC,		SHT1X_BOTH_PINS,	0,				4,	NULL,	0,	{SHT1X_SIDX_RS_CRC_3, SHT1X_SIDX_RS_CRC_3}, {SHT1X_ERROR_OK, SHT1X_ERROR_OK}},
+	/* SHT1X_SIDX_RS_CRC_3 */	{SHT1X_SOUT_GPIO,						SHT1X_DATA_OUT_PIN,	0,				0,	NULL,	0,	{SHT1X_SIDX_RS_CRC_3C, SHT1X_SIDX_RS_CRC_3C}, {SHT1X_ERROR_OK, SHT1X_ERROR_OK}},
+	/* SHT1X_SIDX_RS_CRC_3C */	{SHT1X_SOUT_GPIO | SHT1X_SOUT_CRC,		SHT1X_BOTH_PINS,	0,				3,	NULL,	0,	{SHT1X_SIDX_RS_CRC_2, SHT1X_SIDX_RS_CRC_2}, {SHT1X_ERROR_OK, SHT1X_ERROR_OK}},
+	/* SHT1X_SIDX_RS_CRC_2 */	{SHT1X_SOUT_GPIO,						SHT1X_DATA_OUT_PIN,	0,				0,	NULL,	0,	{SHT1X_SIDX_RS_CRC_2C, SHT1X_SIDX_RS_CRC_2C}, {SHT1X_ERROR_OK, SHT1X_ERROR_OK}},
+	/* SHT1X_SIDX_RS_CRC_2C */	{SHT1X_SOUT_GPIO | SHT1X_SOUT_CRC,		SHT1X_BOTH_PINS,	0,				2,	NULL,	0,	{SHT1X_SIDX_RS_CRC_1, SHT1X_SIDX_RS_CRC_1}, {SHT1X_ERROR_OK, SHT1X_ERROR_OK}},
+	/* SHT1X_SIDX_RS_CRC_1 */	{SHT1X_SOUT_GPIO,						SHT1X_DATA_OUT_PIN,	0,				0,	NULL,	0,	{SHT1X_SIDX_RS_CRC_1C, SHT1X_SIDX_RS_CRC_1C}, {SHT1X_ERROR_OK, SHT1X_ERROR_OK}},
+	/* SHT1X_SIDX_RS_CRC_1C */	{SHT1X_SOUT_GPIO | SHT1X_SOUT_CRC,		SHT1X_BOTH_PINS,	0,				1,	NULL,	0,	{SHT1X_SIDX_RS_CRC_0, SHT1X_SIDX_RS_CRC_0}, {SHT1X_ERROR_OK, SHT1X_ERROR_OK}},
+	/* SHT1X_SIDX_RS_CRC_0 */	{SHT1X_SOUT_GPIO,						SHT1X_DATA_OUT_PIN,	0,				0,	NULL,	0,	{SHT1X_SIDX_RS_CRC_0C, SHT1X_SIDX_RS_CRC_0C}, {SHT1X_ERROR_OK, SHT1X_ERROR_OK}},
+	/* SHT1X_SIDX_RS_CRC_0C */	{SHT1X_SOUT_GPIO | SHT1X_SOUT_CRC,		SHT1X_BOTH_PINS,	0,				0,	NULL,	0,	{SHT1X_SIDX_RS_CRC_ACKS, SHT1X_SIDX_RS_CRC_ACKS}, {SHT1X_ERROR_OK, SHT1X_ERROR_OK}},
+
+	/* SHT1X_SIDX_RS_CRC_ACKS */{SHT1X_SOUT_GPIO,						SHT1X_DATA_OUT_PIN,	0,				0,	NULL,	0,	{SHT1X_SIDX_RS_CRC_ACK, SHT1X_SIDX_RS_CRC_ACK}, {SHT1X_ERROR_OK, SHT1X_ERROR_OK}},
+	/* SHT1X_SIDX_RS_CRC_ACK */	{SHT1X_SOUT_GPIO,						0x00,				0,				0,	NULL,	0,	{SHT1X_SIDX_RS_CRC_ACKC, SHT1X_SIDX_RS_CRC_ACKC}, {SHT1X_ERROR_OK, SHT1X_ERROR_OK}},
+	/* SHT1X_SIDX_RS_CRC_ACKC */{SHT1X_SOUT_GPIO,						SHT1X_CLOCK_PIN,	0,				0,	NULL,	0,	{SHT1X_SIDX_END, SHT1X_SIDX_END}, {SHT1X_ERROR_OK, SHT1X_ERROR_OK}},
+
+	/* SHT1X_SIDX_SREG_WRITE */	{SHT1X_SOUT_GPIO | SHT1X_SOUT_TSTART,	SHT1X_BOTH_PINS,	0,				0,	NULL,	0,	{SHT1X_SIDX_END, SHT1X_SIDX_END}, {SHT1X_ERROR_OK, SHT1X_ERROR_OK}},
 };
 
 
@@ -446,7 +483,13 @@ inline void sht1x_debug_toggle()
 
 inline void sht1x_timera_value_set(uint32_t value)
 {
-	HWREG(SHT1X_TIMER_BASE + TIMER_O_ADCEV) = value;
+	HWREG(SHT1X_TIMER_BASE + TIMER_O_TAV) = value;
+}
+
+
+inline uint32_t sht1x_timera_value_get()
+{
+	return HWREG(SHT1X_TIMER_BASE + TIMER_O_TAV);
 }
 
 
@@ -557,10 +600,10 @@ uint8_t sht1x_read_temperature(void)
 	device.state = SHT1X_SIDX_CMD;
 	device.error = SHT1X_ERROR_OK;
 
-	TimerLoadSet(SHT1X_TIMER_BASE, SHT1X_TIMER, SHT1X_CLK_NR);
 	sht1x_disable_interrupt();
 
 	sht1x_udma_set_buffer((void *)measure_temperature_cmd, sizeof(measure_temperature_cmd));
+	TimerLoadSet(SHT1X_TIMER_BASE, SHT1X_TIMER, SHT1X_CLK_NR);
 	sht1x_timer_start();
 
 	xSemaphoreTake(interrupt_semaphore, portMAX_DELAY);
@@ -574,6 +617,51 @@ uint8_t sht1x_read_temperature(void)
 	}
 }
 
+sht1x_error_t sht1x_status_write(uint8_t status)
+{
+	xSemaphoreTake(lock, portMAX_DELAY);
+
+	// memset(device.output_data, 0, sizeof(device.output_data));
+	memcpy(device.output_data, trans_start_pattern, sizeof(trans_start_pattern));
+	memcpy(&device.output_data[sizeof(trans_start_pattern)], sreg_write_pattern, sizeof(sreg_write_pattern));
+
+	uint8_t mask;
+	int i = sizeof(trans_start_pattern) + sizeof(sreg_write_pattern);
+	for (mask = 0x80; mask; mask >>= 1, i += 2) {
+		if (status & mask) {
+			device.output_data[i] = SHT1X_DATA_OUT_PIN;
+			device.output_data[i + 1] = SHT1X_BOTH_PINS;
+		} else {
+			device.output_data[i] = 0x00;
+			device.output_data[i + 1] = SHT1X_CLOCK_PIN;
+		}
+	}
+
+	device.output_data[i++] = SHT1X_DATA_OUT_PIN;
+	device.output_data[i++] = 0x00;
+	device.output_data[i++] = SHT1X_BOTH_PINS;
+
+	device.data = 0;
+	device.crc = 0;
+	device.state = SHT1X_SIDX_SREG_WRITE;
+	device.error = SHT1X_ERROR_OK;
+
+	sht1x_disable_interrupt();
+
+	sht1x_udma_set_buffer(device.output_data, i + 1);
+
+	TimerLoadSet(SHT1X_TIMER_BASE, SHT1X_TIMER, SHT1X_CLK_NR);
+	TimerIntClear(SHT1X_TIMER_BASE, TIMER_TIMA_TIMEOUT);
+	TimerEnable(SHT1X_TIMER_BASE, SHT1X_TIMER);
+
+	xSemaphoreTake(interrupt_semaphore, portMAX_DELAY);
+
+	sht1x_error_t result = device.error;
+	xSemaphoreGive(lock);
+
+	return result;
+}
+
 
 uint8_t sht1x_read_status(void)
 {
@@ -581,14 +669,16 @@ uint8_t sht1x_read_status(void)
 
 	device.data = 0;
 	device.crc = 0;
-	device.state = SHT1X_SIDX_RS_TS;
+	device.state = SHT1X_SIDX_RS;
 	device.error = SHT1X_ERROR_OK;
 
-	TimerLoadSet(SHT1X_TIMER_BASE, SHT1X_TIMER, SHT1X_CLK_NR);
 	sht1x_disable_interrupt();
 
 	sht1x_udma_set_buffer((void *)trans_start_pattern, sizeof(trans_start_pattern));
-	sht1x_timer_start();
+
+	TimerLoadSet(SHT1X_TIMER_BASE, SHT1X_TIMER, SHT1X_CLK_NR);
+	TimerIntClear(SHT1X_TIMER_BASE, TIMER_TIMA_TIMEOUT);
+	TimerEnable(SHT1X_TIMER_BASE, SHT1X_TIMER);
 
 	xSemaphoreTake(interrupt_semaphore, portMAX_DELAY);
 
@@ -604,10 +694,6 @@ uint8_t sht1x_read_status(void)
 
 void sht1x_process()
 {
-	if (device.state == SHT1X_SIDX_RS_TS || device.state == SHT1X_SIDX_RS) {
-		sht1x_debug_toggle();
-	}
-
 	const sht1x_state_t * state = &states[device.state];
 	uint32_t cur_output = state->output;
 
@@ -616,19 +702,13 @@ void sht1x_process()
 	device.state = state->next_state[input];
 	device.error = state->next_error[input];
 
-	if (cur_output % 2) {
-
-	}
-
 	if (cur_output & SHT1X_SOUT_ISTOP) {
 		sht1x_disable_interrupt();
 	}
 
 	if (cur_output & SHT1X_SOUT_DMA) {
-		sht1x_timer_stop();
+		TimerIntDisable(SHT1X_TIMER_BASE, TIMER_TIMA_TIMEOUT);
 		sht1x_udma_set_buffer(state->dma_buff, state->dma_items_count);
-		sht1x_timer_start();
-		//sht1x_timera_value_set(10);
 	}
 
 	if (cur_output & SHT1X_SOUT_GPIO) {
@@ -657,6 +737,10 @@ void sht1x_process()
 		sht1x_timer_stop();
 	}
 
+	if (cur_output & SHT1X_SOUT_TSTART) {
+		TimerIntEnable(SHT1X_TIMER_BASE, TIMER_TIMA_TIMEOUT);
+	}
+
 	if (cur_output & SHT1X_SOUT_DONE) {
 		xSemaphoreGiveFromISR(interrupt_semaphore, NULL);
 		return;
@@ -678,8 +762,7 @@ void timer0a_isr_handler(void)
 	TimerIntClear(SHT1X_TIMER_BASE, timer_status);
 	uDMAIntClear(udma_status);
 
-	if (/*!(udma_status & SHT1X_UDMA_CH_NUM) &&*/ (timer_status & TIMER_TIMA_TIMEOUT)) {
-		//sht1x_debug_toggle();
+	if (timer_status & TIMER_TIMA_TIMEOUT) {
 		sht1x_process();
 	}
 }
