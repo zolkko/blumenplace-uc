@@ -12,11 +12,24 @@ void main_task(void * params)
 {
 	sht1x_init();
 
+	uint8_t data;
 	while (true) {
-		if (sht1x_status_write(0x00) == SHT1X_ERROR_OK) {
-			printf("Status write succeed\n");
+		printf("Status Register Write\t");
+		if (sht1x_status_write(SHT1X_SREG_OTP_bm) == SHT1X_ERROR_OK) {
+			printf("OK\n");
 		} else {
-			printf("Status write failed\n");
+			printf("FAIL\n");
+		}
+
+		printf("Status Register Read\t");
+		if (sht1x_status_read(&data) == SHT1X_ERROR_OK) {
+			if (data == SHT1X_SREG_OTP_bm) {
+				printf("OK	=	%d\n", data);
+			} else {
+				printf("INVALID = %d expect %d\n", data, SHT1X_SREG_OTP_bm);
+			}
+		} else {
+			printf("FAIL\n");
 		}
 	}
 }
