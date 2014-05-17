@@ -61,7 +61,7 @@
 
 #define SHT1X_TIMER_INTERRUPT	INT_TIMER0A
 
-#define SHT1X_CLOCK_HZ			200000
+#define SHT1X_CLOCK_HZ			50000
 
 /* Timer normal speed  */
 #define SHT1X_CLK_NR			(configCPU_CLOCK_HZ / (SHT1X_CLOCK_HZ * 2))
@@ -742,12 +742,14 @@ void sht1x_process()
 		GPIOPinWrite(SHT1X_PORT_BASE, SHT1X_OUTPUT_PINS, state->gpio);
 	}
 
-	if (cur_output & SHT1X_SOUT_DATA && input) {
-		device.data |= input << state->shift_index;
+	if (cur_output & SHT1X_SOUT_DATA) {
+		device.data <<= 1;
+		device.data |= input;
 	}
 
 	if (cur_output & SHT1X_SOUT_CRC) {
-		device.crc |= input << state->shift_index;
+		device.crc <<= 1;
+		device.crc |= input;
 	}
 
 	if (cur_output & SHT1X_SOUT_TSPEED) {
