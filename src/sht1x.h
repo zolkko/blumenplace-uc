@@ -22,6 +22,7 @@ typedef enum {
 	SHT1X_ERROR_NO_PAYLOAD_ACK,
 	SHT1X_ERROR_MEASUREMENT_TIMEOUT,
 	SHT1X_ERROR_INVALID_STATE,
+	SHT1X_ERROR_BUSY,
 	SHT1X_ERROR_UNKNOWN
 } sht1x_error_t;
 
@@ -31,7 +32,9 @@ sht1x_error_t sht1x_status_read(uint8_t * data);
 
 sht1x_error_t sht1x_status_write(uint8_t status);
 
-uint8_t sht1x_read_temperature(void);
+sht1x_error_t sht1x_temperature_read(uint16_t * temperature);
+
+sht1x_error_t sht1x_moisture_read(uint16_t * moisture);
 
 #ifdef __cplusplus
 }

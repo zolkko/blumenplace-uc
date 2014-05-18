@@ -214,11 +214,13 @@ typedef enum {
 	SHT1X_SIDX_SREGR_CRC_ACKC,
 
 	/* Status Register Write */
+	SHT1X_SIDX_SREGW_FIN,
 	SHT1X_SIDX_SREGW_ACK,
 	SHT1X_SIDX_SREGW_ACKC,
 	SHT1X_SIDX_SREGW_ACKE,
 
 	SHT1X_SIDX_SREGW_PAYLOAD,
+	SHT1X_SIDX_SREGW_PAYLOAD_FIN,
 	SHT1X_SIDX_SREGW_PAYLOAD_ACK,
 	SHT1X_SIDX_SREGW_PAYLOAD_ACKC,
 	SHT1X_SIDX_SREGW_PAYLOAD_ACKE,
@@ -238,7 +240,8 @@ typedef enum {
 	SHT1X_SOUT_ISTART = (1 << 7),
 	SHT1X_SOUT_ISTOP = (1 << 8),
 	SHT1X_SOUT_DMA = (1 << 9),
-	SHT1X_SOUT_DONE= (1 << 10)
+	SHT1X_SOUT_PAYLOAD = (1 << 10),
+	SHT1X_SOUT_DONE= (1 << 11)
 } sht1x_sout_t;
 
 
@@ -249,8 +252,8 @@ typedef struct {
 	uint16_t data;
 	uint8_t crc;
 
-	uint8_t cmd[64];
-	uint8_t cmd_payload[16];
+	uint8_t cmd[255];
+	uint8_t cmd_payload[24];
 } sht1x_device_t;
 
 
@@ -481,14 +484,17 @@ static sht1x_state_t states[] = {
 	/* SHT1X_SIDX_SREGR_CRC_ACKC */{SHT1X_SOUT_GPIO,						SHT1X_CLOCK_PIN,	0,				NULL,	0,	{SHT1X_SIDX_END, SHT1X_SIDX_END}, {SHT1X_ERROR_OK, SHT1X_ERROR_OK}},
 
 	/* Status Register Write */
-	/* SHT1X_SIDX_SREGW_ACK */			{SHT1X_SOUT_GPIO |
-										 SHT1X_SOUT_TSTART,	SHT1X_DATA_OUT_PIN,	0,	NULL,				0,	{SHT1X_SIDX_SREGW_ACKC, SHT1X_SIDX_SREGW_ACKC}, {SHT1X_ERROR_OK, SHT1X_ERROR_OK}},
+	/* SHT1X_SIDX_SREGW_FIN */			{SHT1X_SOUT_TSTART,	0,					0,	NULL,				0,	{SHT1X_SIDX_SREGW_ACK, SHT1X_SIDX_SREGW_ACK}, {SHT1X_ERROR_OK, SHT1X_ERROR_OK}},
+
+	/* SHT1X_SIDX_SREGW_ACK */			{SHT1X_SOUT_GPIO,	SHT1X_DATA_OUT_PIN,	0,	NULL,				0,	{SHT1X_SIDX_SREGW_ACKC, SHT1X_SIDX_SREGW_ACKC}, {SHT1X_ERROR_OK, SHT1X_ERROR_OK}},
 	/* SHT1X_SIDX_SREGW_ACKC */			{SHT1X_SOUT_GPIO,	SHT1X_BOTH_PINS,	0,	NULL,				0,	{SHT1X_SIDX_SREGW_ACKE, SHT1X_SIDX_FAIL}, {SHT1X_ERROR_OK, SHT1X_ERROR_NO_CMD_ACK}},
 	/* SHT1X_SIDX_SREGW_ACKE */			{SHT1X_SOUT_GPIO,	SHT1X_DATA_OUT_PIN,	0,	NULL,				0,	{SHT1X_SIDX_SREGW_PAYLOAD, SHT1X_SIDX_SREGW_PAYLOAD}, {SHT1X_ERROR_OK, SHT1X_ERROR_OK}},
-	/* SHT1X_SIDX_SREGW_PAYLOAD */		{SHT1X_SOUT_DMA,	0,					0,	device.cmd_payload, 16,	{SHT1X_SIDX_SREGW_PAYLOAD_ACK, SHT1X_SIDX_SREGW_PAYLOAD_ACK}, {SHT1X_ERROR_OK, SHT1X_ERROR_OK}},
-	/* SHT1X_SIDX_SREGW_PAYLOAD_ACK */	{SHT1X_SOUT_GPIO |
-										 SHT1X_SOUT_TSTART,	SHT1X_DATA_OUT_PIN,	0,	NULL,				0,	{SHT1X_SIDX_SREGW_PAYLOAD_ACKC, SHT1X_SIDX_SREGW_PAYLOAD_ACKC}, {SHT1X_ERROR_OK, SHT1X_ERROR_OK}},
-	/* SHT1X_SIDX_SREGW_PAYLOAD_ACKC */	{SHT1X_SOUT_GPIO,	SHT1X_BOTH_PINS,	0,	NULL,				0,	{SHT1X_SIDX_SREGW_PAYLOAD_ACKE, SHT1X_SIDX_FAIL}, {SHT1X_ERROR_OK, SHT1X_ERROR_NO_PAYLOAD_ACK}},
+
+	/* SHT1X_SIDX_SREGW_PAYLOAD */		{SHT1X_SOUT_PAYLOAD,0,					0,	device.cmd_payload, 24,	{SHT1X_SIDX_SREGW_PAYLOAD_FIN, SHT1X_SIDX_SREGW_PAYLOAD_FIN}, {SHT1X_ERROR_OK, SHT1X_ERROR_OK}},
+	/* SHT1X_SIDX_SREGW_PAYLOAD_FIN */	{SHT1X_SOUT_TSTART,	0,					0,	NULL,				0,	{SHT1X_SIDX_SREGW_PAYLOAD_ACK, SHT1X_SIDX_SREGW_PAYLOAD_ACK}, {SHT1X_ERROR_OK, SHT1X_ERROR_OK}},
+
+	/* SHT1X_SIDX_SREGW_PAYLOAD_ACK */	{SHT1X_SOUT_GPIO,	SHT1X_DATA_OUT_PIN,	0,	NULL,				0,	{SHT1X_SIDX_SREGW_PAYLOAD_ACKC, SHT1X_SIDX_SREGW_PAYLOAD_ACKC}, {SHT1X_ERROR_OK, SHT1X_ERROR_OK}},
+	/* SHT1X_SIDX_SREGW_PAYLOAD_ACKC */	{SHT1X_SOUT_GPIO,	SHT1X_BOTH_PINS,	0,	NULL,				0,	{SHT1X_SIDX_SREGW_PAYLOAD_ACKE, SHT1X_SIDX_SREGW_PAYLOAD_ACKE}, {SHT1X_ERROR_OK, SHT1X_ERROR_OK}},
 	/* SHT1X_SIDX_SREGW_PAYLOAD_ACKE */	{SHT1X_SOUT_GPIO,	SHT1X_DATA_OUT_PIN,	0,	NULL,				0,	{SHT1X_SIDX_END, SHT1X_SIDX_END}, {SHT1X_ERROR_OK, SHT1X_ERROR_OK}},
 };
 
@@ -618,109 +624,115 @@ void sht1x_udma_set_buffer(void * data, uint32_t transfer_size)
 }
 
 
-uint8_t sht1x_read_temperature(void)
+void sht1x_device_prepare(sht1x_sidx_t next_state, const uint8_t * command, size_t command_size)
 {
-	xSemaphoreTake(lock, portMAX_DELAY);
+	memcpy(device.cmd, trans_start_pattern, sizeof(trans_start_pattern));
+	memcpy(&device.cmd[sizeof(trans_start_pattern)], command, command_size);
 
 	device.data = 0;
 	device.crc = 0;
-	device.state = SHT1X_SIDX_CMD;
+	device.state = next_state;
 	device.error = SHT1X_ERROR_OK;
-
-	sht1x_disable_interrupt();
-
-	sht1x_udma_set_buffer((void *)measure_temperature_cmd, sizeof(measure_temperature_cmd));
-	TimerLoadSet(SHT1X_TIMER_BASE, SHT1X_TIMER, SHT1X_CLK_NR);
-	sht1x_timer_start();
-
-	xSemaphoreTake(interrupt_semaphore, portMAX_DELAY);
-
-	if (device.error == SHT1X_ERROR_OK) {
-		xSemaphoreGive(lock);
-		return 1;
-	} else {
-		xSemaphoreGive(lock);
-		return 0;
-	}
 }
+
+
+sht1x_error_t sht1x_temperature_read(uint16_t * temperature)
+{
+	sht1x_error_t result = SHT1X_ERROR_BUSY;
+
+	if (xSemaphoreTake(lock, portMAX_DELAY) == pdTRUE) {
+		// sht1x_device_prepare(SHT1X_SIDX_CMD_ACKS,  measure_temperature_cmd, sizeof(measure_temperature_cmd));
+
+		sht1x_disable_interrupt();
+
+		sht1x_udma_set_buffer((void *)device.cmd, sizeof(trans_start_pattern) + sizeof(measure_temperature_cmd));
+		TimerLoadSet(SHT1X_TIMER_BASE, SHT1X_TIMER, SHT1X_CLK_NR);
+		sht1x_timer_start();
+
+		if (xSemaphoreTake(interrupt_semaphore, portMAX_DELAY) == pdTRUE) {
+			result = device.error;
+			if (device.error == SHT1X_ERROR_OK && temperature != NULL) {
+				*temperature = device.data;
+			}
+		}
+
+		xSemaphoreGive(lock);
+	}
+	return result;
+}
+
 
 sht1x_error_t sht1x_status_write(uint8_t status)
 {
-	xSemaphoreTake(lock, portMAX_DELAY);
-
-	memcpy(device.cmd, trans_start_pattern, sizeof(trans_start_pattern));
-	memcpy(&device.cmd[sizeof(trans_start_pattern)], sreg_write_pattern, sizeof(sreg_write_pattern));
-
-	uint8_t i;
-	uint8_t mask;
-	for (mask = 0x80; mask; mask >>= 1, i += 2) {
-		if (status & mask) {
-			device.cmd_payload[i] = SHT1X_DATA_OUT_PIN;
-			device.cmd_payload[i + 1] = SHT1X_BOTH_PINS;
-		} else {
-			device.cmd_payload[i] = 0x00;
-			device.cmd_payload[i + 1] = SHT1X_CLOCK_PIN;
+	sht1x_error_t result = SHT1X_ERROR_UNKNOWN;
+	if (xSemaphoreTake(lock, portMAX_DELAY) == pdTRUE) {
+		uint8_t i;
+		uint8_t mask;
+		for (mask = 0x80, i = 0; mask; mask >>= 1, i += /*3*/ 2) {
+			if (status & mask) {
+				device.cmd_payload[i] = SHT1X_DATA_OUT_PIN;
+				device.cmd_payload[i + 1] = SHT1X_BOTH_PINS;
+				// device.cmd_payload[i + 2] = SHT1X_DATA_OUT_PIN;
+			} else {
+				device.cmd_payload[i] = 0x00;
+				device.cmd_payload[i + 1] = SHT1X_CLOCK_PIN;
+				// device.cmd_payload[i + 2] = 0x00;
+			}
 		}
+
+		sht1x_device_prepare(SHT1X_SIDX_SREGW_FIN, sreg_write_pattern, sizeof(sreg_write_pattern));
+
+		sht1x_disable_interrupt();
+
+		sht1x_udma_set_buffer(device.cmd, sizeof(trans_start_pattern) + sizeof(sreg_write_pattern));
+
+		TimerLoadSet(SHT1X_TIMER_BASE, SHT1X_TIMER, SHT1X_CLK_NR);
+		TimerIntClear(SHT1X_TIMER_BASE, TIMER_TIMA_TIMEOUT);
+		TimerEnable(SHT1X_TIMER_BASE, SHT1X_TIMER);
+
+		xSemaphoreTake(interrupt_semaphore, portMAX_DELAY);
+
+		result = device.error;
+		xSemaphoreGive(lock);
 	}
-
-	device.data = 0;
-	device.crc = 0;
-	device.state = SHT1X_SIDX_SREGW_ACK;
-	device.error = SHT1X_ERROR_OK;
-
-	sht1x_disable_interrupt();
-
-	sht1x_udma_set_buffer(device.cmd, sizeof(trans_start_pattern) + sizeof(sreg_write_pattern));
-
-	TimerLoadSet(SHT1X_TIMER_BASE, SHT1X_TIMER, SHT1X_CLK_NR);
-	TimerIntClear(SHT1X_TIMER_BASE, TIMER_TIMA_TIMEOUT);
-	TimerEnable(SHT1X_TIMER_BASE, SHT1X_TIMER);
-
-	xSemaphoreTake(interrupt_semaphore, portMAX_DELAY);
-
-	sht1x_error_t result = device.error;
-	xSemaphoreGive(lock);
-
 	return result;
 }
 
 
 sht1x_error_t sht1x_status_read(uint8_t * status)
 {
-	xSemaphoreTake(lock, portMAX_DELAY);
+	sht1x_error_t result = SHT1X_ERROR_UNKNOWN;
 
-	memcpy(device.cmd, trans_start_pattern, sizeof(trans_start_pattern));
-	memcpy(&device.cmd[sizeof(trans_start_pattern)], sreg_read_pattern, sizeof(sreg_read_pattern));
+	if (xSemaphoreTake(lock, portMAX_DELAY) == pdTRUE) {
+		sht1x_device_prepare(SHT1X_SIDX_SREGR_ACK, sreg_read_pattern, sizeof(sreg_read_pattern));
 
-	device.data = 0;
-	device.crc = 0;
-	device.state = SHT1X_SIDX_SREGR_ACK;
-	device.error = SHT1X_ERROR_OK;
+		sht1x_disable_interrupt();
 
-	sht1x_disable_interrupt();
+		sht1x_udma_set_buffer((void *) device.cmd, sizeof(trans_start_pattern) + sizeof(sreg_read_pattern));
 
-	sht1x_udma_set_buffer((void *) device.cmd, sizeof(trans_start_pattern) + sizeof(sreg_read_pattern));
+		TimerLoadSet(SHT1X_TIMER_BASE, SHT1X_TIMER, SHT1X_CLK_NR);
+		TimerIntClear(SHT1X_TIMER_BASE, TIMER_TIMA_TIMEOUT);
+		TimerEnable(SHT1X_TIMER_BASE, SHT1X_TIMER);
 
-	TimerLoadSet(SHT1X_TIMER_BASE, SHT1X_TIMER, SHT1X_CLK_NR);
-	TimerIntClear(SHT1X_TIMER_BASE, TIMER_TIMA_TIMEOUT);
-	TimerEnable(SHT1X_TIMER_BASE, SHT1X_TIMER);
-
-	xSemaphoreTake(interrupt_semaphore, portMAX_DELAY);
-
-	sht1x_error_t result = device.error;
-
-	if (result == SHT1X_ERROR_OK && status != NULL) {
-		*status = device.data & 0xff;
+		if (xSemaphoreTake(interrupt_semaphore, portMAX_DELAY) == pdTRUE) {
+			result = device.error;
+			if (result == SHT1X_ERROR_OK && status != NULL) {
+				*status = device.data & 0xff;
+			}
+			xSemaphoreGive(lock);
+		}
 	}
 
-	xSemaphoreGive(lock);
 	return result;
 }
 
 
 void sht1x_process()
 {
+	sht1x_debug_toggle();
+
 	const sht1x_state_t * state = &states[device.state];
+
 	uint32_t cur_output = state->output;
 
 	uint8_t input = (sht1x_data_in_get() & SHT1X_DATA_IN_PIN) >> SHT1X_DIN_PIN_bp;
@@ -735,6 +747,17 @@ void sht1x_process()
 	if (cur_output & SHT1X_SOUT_DMA) {
 		TimerIntDisable(SHT1X_TIMER_BASE, TIMER_TIMA_TIMEOUT);
 		sht1x_udma_set_buffer(state->dma_buff, state->dma_items_count);
+	}
+
+	if (cur_output & SHT1X_SOUT_PAYLOAD) {
+		//TimerIntDisable(SHT1X_TIMER_BASE, TIMER_TIMA_TIMEOUT);
+		sht1x_timer_stop();
+
+		sht1x_udma_set_buffer(device.cmd_payload, 16 /* 24 */);
+
+		TimerLoadSet(SHT1X_TIMER_BASE, SHT1X_TIMER, SHT1X_CLK_NR);
+		TimerIntClear(SHT1X_TIMER_BASE, TIMER_TIMA_TIMEOUT);
+		TimerEnable(SHT1X_TIMER_BASE, SHT1X_TIMER);
 	}
 
 	if (cur_output & SHT1X_SOUT_GPIO) {
