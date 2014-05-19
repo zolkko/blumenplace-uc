@@ -18,7 +18,7 @@ void main_task(void * params)
 	sht1x_init();
 
 	uint8_t data;
-	uint8_t expect = SHT1X_SREG_HI_RES_bm;
+	uint8_t expect = SHT1X_SREG_LOW_RES_bm;
 	uint16_t temper = 0;
 	while (true) {
 		printf("Status Register Write\t");
