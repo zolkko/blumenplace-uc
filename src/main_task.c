@@ -18,9 +18,11 @@ void main_task(void * params)
 	sht1x_init();
 
 	uint8_t data;
+	uint8_t expect = SHT1X_SREG_HI_RES_bm;
+	uint16_t temper = 0;
 	while (true) {
 		printf("Status Register Write\t");
-		if (sht1x_status_write(/*SHT1X_SREG_HI_RES_bm*/ 0x00) == SHT1X_ERROR_OK) {
+		if (sht1x_status_write(expect) == SHT1X_ERROR_OK) {
 			printf("OK\n");
 		} else {
 			printf("FAIL\n");
@@ -28,13 +30,20 @@ void main_task(void * params)
 
 		printf("Status Register Read\t");
 		if (sht1x_status_read(&data) == SHT1X_ERROR_OK) {
-			if (data == SHT1X_SREG_HI_RES_bm) {
+			if (data == expect) {
 				printf("OK\t=\t%d\n", data);
 			} else {
-				printf("INVALID=%d\texpect=%d\n", data, SHT1X_SREG_HI_RES_bm);
+				printf("INVALID=%d\texpect=%d\n", data, expect);
 			}
 		} else {
 			printf("FAIL\n");
+		}
+
+		printf("Read temperature");
+		if (sht1x_temperature_read(&temper) == SHT1X_ERROR_OK) {
+			printf("\tOK = %d\n", temper);
+		} else {
+			printf("\tFAIL\n");
 		}
 
 		vTaskDelay(500 / portTICK_PERIOD_MS);
