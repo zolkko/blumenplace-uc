@@ -21,7 +21,7 @@ void main_task(void * params)
 	uint8_t expect; //SHT1X_SREG_LOW_RES_bm;
 	while (true) {
 		for (expect = 0; expect < 2; expect++) {
-			printf("============\nExpected value: %d", expect);
+			printf("============\nExpected value: %d\n", expect);
 
 			printf("Status Register Write\t");
 			if (sht1x_status_write(expect) == SHT1X_ERROR_OK) {

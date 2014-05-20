@@ -15,6 +15,8 @@ extern "C" {
 #define SHT1X_SREG_HEATER_bm		(1 << 2)	/* heater - default off */
 #define SHT1X_SREG_LOW_VOLTAGE_bm	(1 << 6)	/* 0 for VDD > 2.47, 1 for VDD < 2.47 */
 
+#define SHT1X_SREG_bm				(SHT1X_SREG_HEATER_bm | SHT1X_SREG_OTP_bm | SHT1X_SREG_LOW_RES_bm)
+
 typedef enum {
 	SHT1X_ERROR_OK,
 	SHT1X_ERROR_CMD,
@@ -26,6 +28,7 @@ typedef enum {
 	SHT1X_ERROR_INVALID_CRC,
 	SHT1X_ERROR_UNKNOWN
 } sht1x_error_t;
+
 
 void sht1x_init(void);
 
