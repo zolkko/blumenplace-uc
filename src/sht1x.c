@@ -677,11 +677,34 @@ void sht1x_udma_set_buffer(void * data, uint32_t transfer_size)
 }
 
 
-void sht1x_device_prepare(sht1x_sidx_t next_state, const uint8_t * command, size_t command_size)
+void sht1x_command_prepare(const uint8_t * command, size_t command_size)
 {
 	memcpy(device.cmd, trans_start_pattern, sizeof(trans_start_pattern));
 	memcpy(&device.cmd[sizeof(trans_start_pattern)], command, command_size);
+}
 
+/**
+ * shape output signal using value provided
+ */
+void sht1x_command_payload_prepare(uint8_t * buffer, uint8_t value)
+{
+	uint8_t mask;
+	uint8_t data_value = 0;
+
+	for (mask = 0x80; mask; mask >>= 1) {
+		*buffer++ = data_value;
+
+		data_value = value & mask ? SHT1X_DATA_OUT_PIN : 0x00;
+		*buffer++ = data_value;
+
+		*buffer++ = data_value;
+		*buffer++ = data_value | SHT1X_CLOCK_PIN;
+	}
+}
+
+
+void sht1x_device_state_prepare(sht1x_sidx_t next_state)
+{
 	device.data = 0;
 	device.crc = 0;
 	device.state = next_state;
@@ -696,7 +719,8 @@ sht1x_error_t sht1x_temperature_read(uint16_t * temperature)
 	if (xSemaphoreTake(device.lock, portMAX_DELAY) == pdTRUE) {
 		sht1x_disable_interrupt();
 
-		sht1x_device_prepare(SHT1X_SIDX_RTEMPER_FIN,  measure_temperature_cmd, sizeof(measure_temperature_cmd));
+		sht1x_command_prepare(measure_temperature_cmd, sizeof(measure_temperature_cmd));
+		sht1x_device_state_prepare(SHT1X_SIDX_RTEMPER_FIN);
 
 		sht1x_udma_set_buffer((void *)device.cmd, sizeof(trans_start_pattern) + sizeof(measure_temperature_cmd));
 		TimerLoadSet(SHT1X_TIMER_BASE, SHT1X_TIMER, SHT1X_CLK_NR);
@@ -724,32 +748,14 @@ sht1x_error_t sht1x_temperature_read(uint16_t * temperature)
 }
 
 
-sht1x_shape_output_signal(uint8_t * buffer, uint8_t value)
-{
-	uint8_t i;
-    uint8_t mask;
-    uint8_t prev_value = 0;
-	for (mask = 0x80; i = 0; mask >>= 1; i += 4) {
-		buffer[i] = prev_data_value;
-
-		prev_data_value = value & mask ? SHT1X_DATA_OUT_PIN : 0x00;
-		buffer[i + 1] = prev_data_value;
-
-		buffer[i + 2] = prev_data_value;
-		buffer[i + 3] = prev_data_value | SHT1X_CLOCK_PIN;
-	}
-}
-
-
 sht1x_error_t sht1x_status_write(uint8_t status)
 {
 	sht1x_error_t result = SHT1X_ERROR_BUSY;
 
 	if (xSemaphoreTake(device.lock, portMAX_DELAY) == pdTRUE) {
-		// TODO: split method into two peices. One for cmd buffer preparation and another for device structure initialization
-		sht1x_device_prepare(SHT1X_SIDX_SREGW_FIN, sreg_write_pattern, sizeof(sreg_write_pattern));
-		// TODO: keep only allowed bits
-		sht1x_shape_output_signal(device.cmd_payload, status);
+		sht1x_command_prepare(sreg_write_pattern, sizeof(sreg_write_pattern));
+		sht1x_command_payload_prepare(device.cmd_payload, status & SHT1X_SREG_bm);
+		sht1x_device_state_prepare(SHT1X_SIDX_SREGW_FIN);
 
 		sht1x_disable_interrupt();
 
@@ -763,7 +769,7 @@ sht1x_error_t sht1x_status_write(uint8_t status)
 			result = device.error;
 			device.status = status;
 			device.crc_init = sht1x_reverse_bits(status);
-        }
+		}
 		xSemaphoreGive(device.lock);
 	}
 	return result;
@@ -775,7 +781,8 @@ sht1x_error_t sht1x_status_read(uint8_t * status)
 	sht1x_error_t result = SHT1X_ERROR_BUSY;
 
 	if (xSemaphoreTake(device.lock, portMAX_DELAY) == pdTRUE) {
-		sht1x_device_prepare(SHT1X_SIDX_SREGR_FIN, sreg_read_pattern, sizeof(sreg_read_pattern));
+		sht1x_command_prepare(sreg_read_pattern, sizeof(sreg_read_pattern));
+		sht1x_device_state_prepare(SHT1X_SIDX_SREGR_FIN);
 
 		sht1x_disable_interrupt();
 
@@ -788,9 +795,9 @@ sht1x_error_t sht1x_status_read(uint8_t * status)
 		if (xSemaphoreTake(device.interrupt_semaphore, portMAX_DELAY) == pdTRUE) {
 			result = device.error;
 			if (result == SHT1X_ERROR_OK) {
-				uint8_t data[3] = {SHT1X_SREG_READ_CMD, device.data & 0xff, sht1x_reverse_bits(device.crc)};
-				printf("Device CRC: %d\n", device.crc);
+				uint8_t data[] = {SHT1X_SREG_READ_CMD, device.data & 0xff, sht1x_reverse_bits(device.crc)};
 				uint8_t crc = sht1x_crc(data, sizeof(data), device.crc_init);
+
 				if (crc == 0) {
 					device.status = device.data & 0xff;
 					device.crc_init = sht1x_reverse_bits(device.status);
