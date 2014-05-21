@@ -90,9 +90,14 @@
 #define sht1x_data_out_clear()	GPIOPinWrite(SHT1X_PORT_BASE, SHT1X_DATA_OUT_PIN, 0x00)
 #define sht1x_data_in_get()		GPIOPinRead(SHT1X_PORT_BASE, SHT1X_DATA_IN_PIN)
 
-#define SHT1X_DEFAULT_STATUS	(0x00)
+/**
+ * Common definitions
+ */
+#define SHT1X_DEFAULT_STATUS		(0x00)
 
-#define SHT1X_DEFAULT_CRC_INIT	(0x00)
+#define SHT1X_DEFAULT_CRC_INIT		(0x00)
+
+#define SHT1X_PAYLOAD_BUFFER_SIZE	32
 
 /**
  * State index
@@ -256,6 +261,9 @@ typedef enum {
 
 
 typedef struct {
+	xSemaphoreHandle lock;
+	xSemaphoreHandle interrupt_semaphore;
+
 	sht1x_sidx_t state;
 	sht1x_error_t error;
 
@@ -266,7 +274,7 @@ typedef struct {
 	uint8_t crc_init;
 
 	uint8_t cmd[255];
-	uint8_t cmd_payload[24];
+	uint8_t cmd_payload[SHT1X_PAYLOAD_BUFFER_SIZE];
 } sht1x_device_t;
 
 
@@ -549,11 +557,6 @@ uint8_t sht1x_reverse_bits(uint8_t value);
 uint8_t sht1x_crc(uint8_t * data, size_t data_len, uint8_t initial_crc);
 
 
-static xSemaphoreHandle lock = NULL;
-
-static xSemaphoreHandle interrupt_semaphore = NULL;
-
-
 inline void sht1x_debug_toggle()
 {
 	uint32_t dv = GPIOPinRead(SHT1X_PORT_BASE, DEBUG_PIN);
@@ -690,7 +693,7 @@ sht1x_error_t sht1x_temperature_read(uint16_t * temperature)
 {
 	sht1x_error_t result = SHT1X_ERROR_BUSY;
 
-	if (xSemaphoreTake(lock, portMAX_DELAY) == pdTRUE) {
+	if (xSemaphoreTake(device.lock, portMAX_DELAY) == pdTRUE) {
 		sht1x_disable_interrupt();
 
 		sht1x_device_prepare(SHT1X_SIDX_RTEMPER_FIN,  measure_temperature_cmd, sizeof(measure_temperature_cmd));
@@ -699,7 +702,7 @@ sht1x_error_t sht1x_temperature_read(uint16_t * temperature)
 		TimerLoadSet(SHT1X_TIMER_BASE, SHT1X_TIMER, SHT1X_CLK_NR);
 		sht1x_timer_start();
 
-		if (xSemaphoreTake(interrupt_semaphore, portMAX_DELAY) == pdTRUE) {
+		if (xSemaphoreTake(device.interrupt_semaphore, portMAX_DELAY) == pdTRUE) {
 			result = device.error;
 			if (result == SHT1X_ERROR_OK) {
 				// TODO: test if it is depend on currently selected byte order?
@@ -715,9 +718,26 @@ sht1x_error_t sht1x_temperature_read(uint16_t * temperature)
 			}
 		}
 
-		xSemaphoreGive(lock);
+		xSemaphoreGive(device.lock);
 	}
 	return result;
+}
+
+
+sht1x_shape_output_signal(uint8_t * buffer, uint8_t value)
+{
+	uint8_t i;
+    uint8_t mask;
+    uint8_t prev_value = 0;
+	for (mask = 0x80; i = 0; mask >>= 1; i += 4) {
+		buffer[i] = prev_data_value;
+
+		prev_data_value = value & mask ? SHT1X_DATA_OUT_PIN : 0x00;
+		buffer[i + 1] = prev_data_value;
+
+		buffer[i + 2] = prev_data_value;
+		buffer[i + 3] = prev_data_value | SHT1X_CLOCK_PIN;
+	}
 }
 
 
@@ -725,20 +745,11 @@ sht1x_error_t sht1x_status_write(uint8_t status)
 {
 	sht1x_error_t result = SHT1X_ERROR_BUSY;
 
-	if (xSemaphoreTake(lock, portMAX_DELAY) == pdTRUE) {
-		uint8_t i;
-		uint8_t mask;
-		for (mask = 0x80, i = 0; mask; mask >>= 1, i += 2) {
-			if (status & mask) {
-				device.cmd_payload[i] = SHT1X_DATA_OUT_PIN;
-				device.cmd_payload[i + 1] = SHT1X_BOTH_PINS;
-			} else {
-				device.cmd_payload[i] = 0x00;
-				device.cmd_payload[i + 1] = SHT1X_CLOCK_PIN;
-			}
-		}
-
+	if (xSemaphoreTake(device.lock, portMAX_DELAY) == pdTRUE) {
+		// TODO: split method into two peices. One for cmd buffer preparation and another for device structure initialization
 		sht1x_device_prepare(SHT1X_SIDX_SREGW_FIN, sreg_write_pattern, sizeof(sreg_write_pattern));
+		// TODO: keep only allowed bits
+		sht1x_shape_output_signal(device.cmd_payload, status);
 
 		sht1x_disable_interrupt();
 
@@ -748,14 +759,12 @@ sht1x_error_t sht1x_status_write(uint8_t status)
 		TimerIntClear(SHT1X_TIMER_BASE, TIMER_TIMA_TIMEOUT);
 		TimerEnable(SHT1X_TIMER_BASE, SHT1X_TIMER);
 
-		xSemaphoreTake(interrupt_semaphore, portMAX_DELAY);
-
-		result = device.error;
-
-		device.status = status;
-		device.crc_init = sht1x_reverse_bits(status);
-
-		xSemaphoreGive(lock);
+		if (xSemaphoreTake(device.interrupt_semaphore, portMAX_DELAY) == pdTRUE) {
+			result = device.error;
+			device.status = status;
+			device.crc_init = sht1x_reverse_bits(status);
+        }
+		xSemaphoreGive(device.lock);
 	}
 	return result;
 }
@@ -765,7 +774,7 @@ sht1x_error_t sht1x_status_read(uint8_t * status)
 {
 	sht1x_error_t result = SHT1X_ERROR_BUSY;
 
-	if (xSemaphoreTake(lock, portMAX_DELAY) == pdTRUE) {
+	if (xSemaphoreTake(device.lock, portMAX_DELAY) == pdTRUE) {
 		sht1x_device_prepare(SHT1X_SIDX_SREGR_FIN, sreg_read_pattern, sizeof(sreg_read_pattern));
 
 		sht1x_disable_interrupt();
@@ -776,7 +785,7 @@ sht1x_error_t sht1x_status_read(uint8_t * status)
 		TimerIntClear(SHT1X_TIMER_BASE, TIMER_TIMA_TIMEOUT);
 		TimerEnable(SHT1X_TIMER_BASE, SHT1X_TIMER);
 
-		if (xSemaphoreTake(interrupt_semaphore, portMAX_DELAY) == pdTRUE) {
+		if (xSemaphoreTake(device.interrupt_semaphore, portMAX_DELAY) == pdTRUE) {
 			result = device.error;
 			if (result == SHT1X_ERROR_OK) {
 				uint8_t data[3] = {SHT1X_SREG_READ_CMD, device.data & 0xff, sht1x_reverse_bits(device.crc)};
@@ -792,7 +801,7 @@ sht1x_error_t sht1x_status_read(uint8_t * status)
 					result = SHT1X_ERROR_INVALID_CRC;
 				}
 			}
-			xSemaphoreGive(lock);
+			xSemaphoreGive(device.lock);
 		}
 	}
 
@@ -878,14 +887,14 @@ void sht1x_process()
 	}
 
 	if (cur_output & SHT1X_SOUT_DONE) {
-		xSemaphoreGiveFromISR(interrupt_semaphore, NULL);
+		xSemaphoreGiveFromISR(device.interrupt_semaphore, NULL);
 		return;
 	}
 
 	if (device.error != SHT1X_ERROR_OK) {
 		sht1x_disable_interrupt();
 		sht1x_timer_stop();
-		xSemaphoreGiveFromISR(interrupt_semaphore, NULL);
+		xSemaphoreGiveFromISR(device.interrupt_semaphore, NULL);
 	}
 }
 
@@ -925,7 +934,7 @@ void udma_error_isr_handler(void)
 		uDMAErrorStatusClear();
 	}
 
-	xSemaphoreGiveFromISR(interrupt_semaphore, NULL);
+	xSemaphoreGiveFromISR(device.interrupt_semaphore, NULL);
 }
 
 
@@ -958,8 +967,8 @@ uint8_t sht1x_crc(uint8_t * data, size_t data_len, uint8_t initial_crc)
  */
 void sht1x_init(void)
 {
-	lock = xSemaphoreCreateMutex();
-	interrupt_semaphore = xSemaphoreCreateBinary();
+	device.lock = xSemaphoreCreateMutex();
+	device.interrupt_semaphore = xSemaphoreCreateBinary();
 
 	device.status = SHT1X_DEFAULT_STATUS;
 	device.crc_init = SHT1X_DEFAULT_CRC_INIT;
