@@ -323,7 +323,7 @@ static const uint8_t trans_start_pattern[] = {
  * The bit pattern for "Measure Temperature" command.
  * 0x00011
  */
-static const uint8_t measure_temperature_cmd[] = {
+static const uint8_t measure_temperature_pattern[] = {
 	0x00, 0x00,	0x00, SHT1X_CLOCK_PIN, /* c4 */
 	0x00, 0x00,	0x00, SHT1X_CLOCK_PIN, /* c3 */
 	0x00, 0x00,	0x00, SHT1X_CLOCK_PIN, /* c2 */
@@ -337,12 +337,12 @@ static const uint8_t measure_temperature_cmd[] = {
  * The bit pattern for "Measure Relative Humidity" command.
  * 0x00101
  */
-static const uint8_t measure_moisture_cmd[] = {
-	0x00, SHT1X_CLOCK_PIN, /* c4 */
-	0x00, SHT1X_CLOCK_PIN, /* c3 */
-	0x00, SHT1X_CLOCK_PIN, /* c2 */
-	SHT1X_DATA_OUT_PIN, SHT1X_DATA_OUT_PIN | SHT1X_CLOCK_PIN, /* c1 */
-	SHT1X_DATA_OUT_PIN, SHT1X_DATA_OUT_PIN | SHT1X_CLOCK_PIN, /* c0 */
+static const uint8_t measure_moisture_pattern[] = {
+	0x00, 0x00, 0x00, SHT1X_CLOCK_PIN, /* c4 */
+	0x00, 0x00, 0x00, SHT1X_CLOCK_PIN, /* c3 */
+	0x00, SHT1X_DATA_OUT_PIN, SHT1X_DATA_OUT_PIN, SHT1X_BOTH_PINS, /* c2 */
+	SHT1X_DATA_OUT_PIN, 0x00,  SHT1X_CLOCK_PIN, /* c1 */
+	0x00, SHT1X_DATA_OUT_PIN, SHT1X_DATA_OUT_PIN, SHT1X_BOTH_PINS, /* c0 */
 };
 
 #define SHT1X_MOISTURE_READ_CMD		(0x05)
@@ -384,9 +384,6 @@ static const uint8_t soft_reset_pattern[] = {
 	SHT1X_DATA_OUT_PIN, SHT1X_DATA_OUT_PIN, SHT1X_DATA_OUT_PIN, SHT1X_BOTH_PINS, /* c1 */
 	SHT1X_DATA_OUT_PIN, 0x00, 0x00, SHT1X_CLOCK_PIN, /* c0 */
 };
-
-
-static sht1x_device_t device;
 
 
 static const sht1x_state_t states[] = {
@@ -559,13 +556,58 @@ const static uint8_t crc8_lut[] = {
 	130, 179, 224, 209, 70,  119, 36,  21,  59,  10,  89,  104, 255, 206, 157, 172
 };
 
+/**
+ * Temperature calculation coefficients
+ */
+static const float temperature_d1 = -39.6f;
 
-uint8_t sht1x_reverse_bits(uint8_t value);
+static const float temperature_highres_d2 = 0.01f;
 
-uint8_t sht1x_crc(uint8_t * data, size_t data_len, uint8_t initial_crc);
+static const float temperature_lowres_d2 = 0.04f;
+
+static const float moisture_c1 = -2.0468f;
+
+static const float moisture_highres_c2 = 0.0367f;
+
+static const float moisture_lowres_c2 = 0.5872f;
+
+static const float moisture_highres_c3 = -1.5955e-6;
+
+static const float moisture_lowres_c3 = -4.0845e-4;
 
 
-inline void sht1x_debug_toggle()
+static uint8_t sht1x_reverse_bits(uint8_t value);
+
+static uint8_t sht1x_crc(uint8_t * data, size_t data_len, uint8_t initial_crc);
+
+static void sht1x_debug_toggle(void);
+
+static void sht1x_udma_set_buffer(void * data, uint32_t transfer_size);
+
+static void sht1x_gpio_init(void);
+
+static void sht1x_timer_start(void);
+
+static void sht1x_timer_stop(void);
+
+static void sht1x_timer_init(void);
+
+static void sht1x_udma_set_buffer(void * data, uint32_t transfer_size);
+
+static void sht1x_command_prepare(const uint8_t * command, size_t command_size);
+
+static void sht1x_command_payload_prepare(uint8_t * buffer, uint8_t value);
+
+static void sht1x_device_state_prepare(sht1x_sidx_t next_state);
+
+static inline void sht1x_transmission_done(void);
+
+static sht1x_error_t sht1x_sensor_read(uint8_t command, const uint8_t * command_pattern, size_t command_pattern_size, uint16_t * sensor_output);
+
+static void sht1x_process();
+
+
+inline void sht1x_debug_toggle(void)
 {
 	uint32_t dv = GPIOPinRead(SHT1X_PORT_BASE, DEBUG_PIN);
 	if (dv) {
@@ -573,17 +615,6 @@ inline void sht1x_debug_toggle()
 	} else {
 		GPIOPinWrite(SHT1X_PORT_BASE, DEBUG_PIN, DEBUG_PIN);
 	}
-}
-
-inline void sht1x_timera_value_set(uint32_t value)
-{
-	HWREG(SHT1X_TIMER_BASE + TIMER_O_TAV) = value;
-}
-
-
-inline uint32_t sht1x_timera_value_get()
-{
-	return HWREG(SHT1X_TIMER_BASE + TIMER_O_TAV);
 }
 
 
@@ -599,6 +630,8 @@ inline void sht1x_disable_interrupt()
 	GPIOIntDisable(SHT1X_PORT_BASE, SHT1X_DATA_INTERRUPT);
 }
 
+
+static sht1x_device_t device;
 
 /**
  * Initialize GPIO port to support SHT1X I/O operations.
@@ -720,29 +753,28 @@ void sht1x_device_state_prepare(sht1x_sidx_t next_state)
 }
 
 
-sht1x_error_t sht1x_temperature_read(uint16_t * temperature)
+sht1x_error_t sht1x_sensor_read(uint8_t command, const uint8_t * command_pattern, size_t command_pattern_size, uint16_t * sensor_output)
 {
 	sht1x_error_t result = SHT1X_ERROR_BUSY;
 
 	if (xSemaphoreTake(device.lock, portMAX_DELAY) == pdTRUE) {
 		sht1x_disable_interrupt();
 
-		sht1x_command_prepare(measure_temperature_cmd, sizeof(measure_temperature_cmd));
+		sht1x_command_prepare(command_pattern, command_pattern_size);
 		sht1x_device_state_prepare(SHT1X_SIDX_RTEMPER_FIN);
 
-		sht1x_udma_set_buffer((void *)device.cmd, sizeof(trans_start_pattern) + sizeof(measure_temperature_cmd));
+		sht1x_udma_set_buffer((void *)device.cmd, sizeof(trans_start_pattern) + command_pattern_size);
 		TimerLoadSet(SHT1X_TIMER_BASE, SHT1X_TIMER, SHT1X_CLK_NR);
 		sht1x_timer_start();
 
 		if (xSemaphoreTake(device.interrupt_semaphore, portMAX_DELAY) == pdTRUE) {
 			result = device.error;
 			if (result == SHT1X_ERROR_OK) {
-				// TODO: test if it is depend on currently selected byte order?
-				uint8_t data[] = {SHT1X_TEMPERATURE_READ_CMD, (device.data >> 8) & 0xff, device.data & 0xff, sht1x_reverse_bits(device.crc)};
+				uint8_t data[] = {command, (device.data >> 8) & 0xff, device.data & 0xff, sht1x_reverse_bits(device.crc)};
 				uint8_t crc = sht1x_crc(data, sizeof(data), device.crc_init);
 				if (crc == 0) {
-					if (temperature != NULL) {
-						*temperature = device.data;
+					if (sensor_output != NULL) {
+						*sensor_output = device.data;
 					}
 				} else {
 					result = SHT1X_ERROR_INVALID_CRC;
@@ -751,6 +783,30 @@ sht1x_error_t sht1x_temperature_read(uint16_t * temperature)
 		}
 
 		xSemaphoreGive(device.lock);
+	}
+	return result;
+}
+
+
+sht1x_error_t sht1x_temperature_read(float * temperature)
+{
+	uint16_t sensor_output;
+	sht1x_error_t result = sht1x_sensor_read(SHT1X_TEMPERATURE_READ_CMD, measure_temperature_pattern, sizeof(measure_temperature_pattern), &sensor_output);
+	if (result == SHT1X_ERROR_OK && temperature) {
+		*temperature = temperature_d1 + (sensor_output * ((device.status & SHT1X_SREG_LOW_RES_bm) ? temperature_lowres_d2 : temperature_highres_d2));
+	}
+	return result;
+}
+
+
+sht1x_error_t sht1x_moisture_read(float * moisture)
+{
+	uint16_t sensor_output;
+	sht1x_error_t result = sht1x_sensor_read(SHT1X_MOISTURE_READ_CMD, measure_moisture_pattern, sizeof(measure_moisture_pattern), &sensor_output);
+	if (result == SHT1X_ERROR_OK && moisture) {
+		bool low_res = device.status & SHT1X_SREG_LOW_RES_bm;
+		*moisture =  moisture_c1 + ((low_res ? moisture_lowres_c2 : moisture_highres_c2) * sensor_output) +
+									(sensor_output * sensor_output * (low_res ? moisture_lowres_c3 : moisture_highres_c3));
 	}
 	return result;
 }
