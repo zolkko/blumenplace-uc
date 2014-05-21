@@ -365,12 +365,11 @@ static const uint8_t sreg_read_pattern[] = {
  * 0b00110
  */
 static const uint8_t sreg_write_pattern[] = {
-	/* command */
-	0x00, SHT1X_CLOCK_PIN, /* c4 */
-	0x00, SHT1X_CLOCK_PIN, /* c3 */
-	SHT1X_DATA_OUT_PIN, SHT1X_BOTH_PINS, /* c2 */
-	SHT1X_DATA_OUT_PIN, SHT1X_BOTH_PINS, /* c1 */
-	0x00, SHT1X_CLOCK_PIN, /* c0 */
+	0x00, 0x00, 0x00, SHT1X_CLOCK_PIN, /* c4 */
+	0x00, 0x00, 0x00, SHT1X_CLOCK_PIN, /* c3 */
+	0x00, SHT1X_DATA_OUT_PIN, SHT1X_DATA_OUT_PIN, SHT1X_BOTH_PINS, /* c2 */
+	SHT1X_DATA_OUT_PIN, SHT1X_DATA_OUT_PIN, SHT1X_DATA_OUT_PIN, SHT1X_BOTH_PINS, /* c1 */
+	SHT1X_DATA_OUT_PIN, 0x00, 0x00, SHT1X_CLOCK_PIN, /* c0 */
 };
 
 
@@ -844,7 +843,7 @@ void sht1x_process()
 		//TimerIntDisable(SHT1X_TIMER_BASE, TIMER_TIMA_TIMEOUT);
 		sht1x_timer_stop();
 
-		sht1x_udma_set_buffer(device.cmd_payload, 16 /* 24 */);
+		sht1x_udma_set_buffer(device.cmd_payload, SHT1X_PAYLOAD_BUFFER_SIZE);
 
 		TimerLoadSet(SHT1X_TIMER_BASE, SHT1X_TIMER, SHT1X_CLK_NR);
 		TimerIntClear(SHT1X_TIMER_BASE, TIMER_TIMA_TIMEOUT);
