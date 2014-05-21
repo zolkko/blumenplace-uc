@@ -61,7 +61,7 @@
 
 #define SHT1X_TIMER_INTERRUPT	INT_TIMER0A
 
-#define SHT1X_CLOCK_HZ			50000
+#define SHT1X_CLOCK_HZ			200000
 
 /* Timer normal speed  */
 #define SHT1X_CLK_NR			(configCPU_CLOCK_HZ / (SHT1X_CLOCK_HZ * 2))
