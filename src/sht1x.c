@@ -238,6 +238,12 @@ typedef enum {
 	SHT1X_SIDX_SREGW_PAYLOAD_ACK,
 	SHT1X_SIDX_SREGW_PAYLOAD_ACKC,
 	SHT1X_SIDX_SREGW_PAYLOAD_ACKE,
+
+	/* Software Reset */
+	SHT1X_SIDX_SOFT_RESET_FIN,
+	SHT1X_SIDX_SOFT_RESET_ACK,
+	SHT1X_SIDX_SOFT_RESET_ACKC,
+	SHT1X_SIDX_SOFT_RESET_ACKE,
 } sht1x_sidx_t;
 
 /**
@@ -368,6 +374,18 @@ static const uint8_t sreg_write_pattern[] = {
 	0x00, 0x00, 0x00, SHT1X_CLOCK_PIN, /* c4 */
 	0x00, 0x00, 0x00, SHT1X_CLOCK_PIN, /* c3 */
 	0x00, SHT1X_DATA_OUT_PIN, SHT1X_DATA_OUT_PIN, SHT1X_BOTH_PINS, /* c2 */
+	SHT1X_DATA_OUT_PIN, SHT1X_DATA_OUT_PIN, SHT1X_DATA_OUT_PIN, SHT1X_BOTH_PINS, /* c1 */
+	SHT1X_DATA_OUT_PIN, 0x00, 0x00, SHT1X_CLOCK_PIN, /* c0 */
+};
+
+/**
+ * The bit pattern for "Soft Reset" command.
+ * 0b11110
+ */
+static const uint8_t soft_reset_pattern[] = {
+	0x00, SHT1X_DATA_OUT_PIN, SHT1X_DATA_OUT_PIN, SHT1X_BOTH_PINS, /* c4 */
+	SHT1X_DATA_OUT_PIN, SHT1X_DATA_OUT_PIN, SHT1X_DATA_OUT_PIN, SHT1X_BOTH_PINS, /* c3 */
+	SHT1X_DATA_OUT_PIN, SHT1X_DATA_OUT_PIN, SHT1X_DATA_OUT_PIN, SHT1X_BOTH_PINS, /* c2 */
 	SHT1X_DATA_OUT_PIN, SHT1X_DATA_OUT_PIN, SHT1X_DATA_OUT_PIN, SHT1X_BOTH_PINS, /* c1 */
 	SHT1X_DATA_OUT_PIN, 0x00, 0x00, SHT1X_CLOCK_PIN, /* c0 */
 };
@@ -525,6 +543,12 @@ static sht1x_state_t states[] = {
 	/* SHT1X_SIDX_SREGW_PAYLOAD_ACK */	{SHT1X_SOUT_GPIO,	SHT1X_DATA_OUT_PIN,	0,	NULL,				0,	{SHT1X_SIDX_SREGW_PAYLOAD_ACKC, SHT1X_SIDX_SREGW_PAYLOAD_ACKC}, {SHT1X_ERROR_OK, SHT1X_ERROR_OK}},
 	/* SHT1X_SIDX_SREGW_PAYLOAD_ACKC */	{SHT1X_SOUT_GPIO,	SHT1X_BOTH_PINS,	0,	NULL,				0,	{SHT1X_SIDX_SREGW_PAYLOAD_ACKE, SHT1X_SIDX_SREGW_PAYLOAD_ACKE}, {SHT1X_ERROR_OK, SHT1X_ERROR_OK}},
 	/* SHT1X_SIDX_SREGW_PAYLOAD_ACKE */	{SHT1X_SOUT_GPIO,	SHT1X_DATA_OUT_PIN,	0,	NULL,				0,	{SHT1X_SIDX_END, SHT1X_SIDX_END}, {SHT1X_ERROR_OK, SHT1X_ERROR_OK}},
+
+	/* Software Reset */
+	/* SHT1X_SIDX_SOFT_RESET_FIN */		{SHT1X_SOUT_TSTART, 0,					0, NULL,				0,  {SHT1X_SIDX_SOFT_RESET_ACK, SHT1X_SIDX_SOFT_RESET_ACK},  {SHT1X_ERROR_OK, SHT1X_ERROR_OK}},
+	/* SHT1X_SIDX_SOFT_RESET_ACK */		{SHT1X_SOUT_GPIO,	SHT1X_DATA_OUT_PIN,	0,	NULL,				0,	{SHT1X_SIDX_SOFT_RESET_ACKC, SHT1X_SIDX_SOFT_RESET_ACKC}, {SHT1X_ERROR_OK, SHT1X_ERROR_OK}},
+	/* SHT1X_SIDX_SOFT_RESET_ACKC */	{SHT1X_SOUT_GPIO,	SHT1X_BOTH_PINS,	0,	NULL,				0,	{SHT1X_SIDX_SOFT_RESET_ACKE, SHT1X_SIDX_FAIL}, {SHT1X_ERROR_OK, SHT1X_ERROR_NO_CMD_ACK}},
+	/* SHT1X_SIDX_SOFT_RESET_ACKE */	{SHT1X_SOUT_GPIO,	SHT1X_DATA_OUT_PIN,	0,	NULL,				0,	{SHT1X_SIDX_END, SHT1X_SIDX_END}, {SHT1X_ERROR_OK, SHT1X_ERROR_OK}},
 };
 
 /**
@@ -807,8 +831,36 @@ sht1x_error_t sht1x_status_read(uint8_t * status)
 					result = SHT1X_ERROR_INVALID_CRC;
 				}
 			}
-			xSemaphoreGive(device.lock);
 		}
+		xSemaphoreGive(device.lock);
+	}
+
+	return result;
+}
+
+
+sht1x_error_t sht1x_software_reset(void)
+{
+	sht1x_error_t result = SHT1X_ERROR_BUSY;
+
+	if (xSemaphoreTake(device.lock, portMAX_DELAY) == pdTRUE) {
+		sht1x_command_prepare(soft_reset_pattern, sizeof(soft_reset_pattern));
+		sht1x_device_state_prepare(SHT1X_SIDX_SOFT_RESET_FIN);
+
+		sht1x_disable_interrupt();
+
+		sht1x_udma_set_buffer((void *) device.cmd, sizeof(trans_start_pattern) + sizeof(sreg_read_pattern));
+
+		TimerLoadSet(SHT1X_TIMER_BASE, SHT1X_TIMER, SHT1X_CLK_NR);
+		TimerIntClear(SHT1X_TIMER_BASE, TIMER_TIMA_TIMEOUT);
+		TimerEnable(SHT1X_TIMER_BASE, SHT1X_TIMER);
+
+		if (xSemaphoreTake(device.interrupt_semaphore, portMAX_DELAY) == pdTRUE) {
+			result = device.error;
+			device.status = SHT1X_DEFAULT_STATUS;
+			device.crc_init = SHT1X_DEFAULT_CRC_INIT;
+		}
+		xSemaphoreGive(device.lock);
 	}
 
 	return result;
