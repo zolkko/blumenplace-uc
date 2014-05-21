@@ -40,7 +40,7 @@ sht1x_error_t sht1x_temperature_read(uint16_t * temperature);
 
 sht1x_error_t sht1x_moisture_read(uint16_t * moisture);
 
-sht1x_error_t sht1x_soft_reset(void);
+sht1x_error_t sht1x_software_reset(void);
 
 #ifdef __cplusplus
 }
