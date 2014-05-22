@@ -1,6 +1,26 @@
-/**
- * SHT1X driver implementation for TM4C123
+/*
+ * sht1x.c - A SHT1x temperature and relative humidity sensor driver for tm4c123
+ *
+ * Copyright (c) 2014 Alexey Anisimov <zolkko@gmail.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with program.  If not, see <http://www.gnu.org/licenses/>
  */
+
+/*
+ * TODO: extract hardware dependent and utility functions into separate modules.
+ */
+
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -25,7 +45,7 @@
 #include "sht1x.h"
 #include "hw_udma_tbl.h"
 
-/**
+/*
  * GPIO PORT Settings
  */
 #define SHT1X_GPIO_PERIPH		SYSCTL_PERIPH_GPIOE
@@ -44,13 +64,9 @@
 
 #define SHT1X_GPIO_INTERRUPT	INT_GPIOE
 
-#define SHT1X_OUTPUT_PINS		(SHT1X_CLOCK_PIN | SHT1X_DATA_OUT_PIN)
-
 #define SHT1X_BOTH_PINS			(SHT1X_CLOCK_PIN | SHT1X_DATA_OUT_PIN)
 
-#define DEBUG_PIN				GPIO_PIN_4
-
-/**
+/*
  * TIMER Settings
  */
 #define SHT1X_TIMER_PERIPH		SYSCTL_PERIPH_TIMER0
@@ -70,19 +86,20 @@
 #define SHT1X_CLK_LO			(configCPU_CLOCK_HZ / 1)
 
 
-/**
+/*
  * uDMA Settings
  */
 #define SHT1X_UDMA_PERIPH		SYSCTL_PERIPH_UDMA
 
-#define SHT1X_DST_ADDRESS		((void *)(SHT1X_PORT_BASE + (GPIO_O_DATA + (SHT1X_OUTPUT_PINS << 2))))
+#define SHT1X_DST_ADDRESS		((void *)(SHT1X_PORT_BASE + (GPIO_O_DATA + (SHT1X_BOTH_PINS << 2))))
 
 #define SHT1X_UDMA_CHANNEL		UDMA_CHANNEL_TMR0A
 
 #define SHT1X_UDMA_CH_NUM		UDMA_DEF_TMR0A_SEC_TMR1A
 
-/**
+/*
  * Utility macros
+ * TODO: remove redundant definitions and replace the rest of them with inline functions
  */
 #define sht1x_clock_set()		GPIOPinWrite(SHT1X_PORT_BASE, SHT1X_CLOCK_PIN, SHT1X_CLOCK_PIN)
 #define sht1x_clock_clear()		GPIOPinWrite(SHT1X_PORT_BASE, SHT1X_CLOCK_PIN, 0x00)
@@ -90,17 +107,18 @@
 #define sht1x_data_out_clear()	GPIOPinWrite(SHT1X_PORT_BASE, SHT1X_DATA_OUT_PIN, 0x00)
 #define sht1x_data_in_get()		GPIOPinRead(SHT1X_PORT_BASE, SHT1X_DATA_IN_PIN)
 
-/**
- * Common definitions
- */
+/* Common definitions */
 #define SHT1X_DEFAULT_STATUS		(0x00)
 
 #define SHT1X_DEFAULT_CRC_INIT		(0x00)
 
 #define SHT1X_PAYLOAD_BUFFER_SIZE	32
 
-/**
- * State index
+/*
+ * State Indexes
+ *
+ * Please note that an order of the enum should correspond
+ * to an order of array elements in states variable.
  */
 typedef enum {
 	SHT1X_SIDX_END = 0,
@@ -243,7 +261,7 @@ typedef enum {
 	SHT1X_SIDX_SOFT_RESET_ACKE,
 } sht1x_sidx_t;
 
-/**
+/*
  * Types of output which a state produces.
  */
 typedef enum {
@@ -289,9 +307,7 @@ typedef struct {
 	sht1x_error_t next_error[2];
 } sht1x_state_t;
 
-/**
- * Transmission start and Register address sequence pattern
- */
+/* Transmission start and Register address sequence pattern */
 static const uint8_t trans_start_pattern[] = {
 	/* reset sequence */
 	SHT1X_DATA_OUT_PIN | SHT1X_CLOCK_PIN, SHT1X_DATA_OUT_PIN | SHT1X_CLOCK_PIN, SHT1X_DATA_OUT_PIN, SHT1X_DATA_OUT_PIN,
@@ -317,7 +333,7 @@ static const uint8_t trans_start_pattern[] = {
 	0x00, 0x00, SHT1X_CLOCK_PIN, SHT1X_CLOCK_PIN, /* a0 */
 };
 
-/**
+/*
  * The bit pattern for "Measure Temperature" command.
  * 0x00011
  */
@@ -331,7 +347,7 @@ static const uint8_t measure_temperature_pattern[] = {
 
 #define SHT1X_TEMPERATURE_READ_CMD	(0x03)
 
-/**
+/*
  * The bit pattern for "Measure Relative Humidity" command.
  * 0x00101
  */
@@ -345,7 +361,7 @@ static const uint8_t measure_moisture_pattern[] = {
 
 #define SHT1X_MOISTURE_READ_CMD		(0x05)
 
-/**
+/*
  * The bit pattern for "Status Register Read" command.
  * 0b00111
  */
@@ -359,7 +375,7 @@ static const uint8_t sreg_read_pattern[] = {
 
 #define SHT1X_SREG_READ_CMD			(0x07)
 
-/**
+/*
  * The bit pattern for "Status Register Read" command.
  * 0b00110
  */
@@ -371,7 +387,7 @@ static const uint8_t sreg_write_pattern[] = {
 	SHT1X_DATA_OUT_PIN, 0x00, 0x00, SHT1X_CLOCK_PIN, /* c0 */
 };
 
-/**
+/*
  * The bit pattern for "Soft Reset" command.
  * 0b11110
  */
@@ -530,7 +546,7 @@ static const sht1x_state_t states[] = {
 	/* SHT1X_SIDX_SOFT_RESET_ACKE */	{SHT1X_STATE_OUTPUT_OUTPUT_ACK_FALLING_EDGE,	{SHT1X_SIDX_END, SHT1X_SIDX_FAIL}, {SHT1X_ERROR_OK, SHT1X_ERROR_NO_CMD_ACK}},
 };
 
-/**
+/*
  * CRC-8 lookup table for polynomial x^8 + x^5 + x^4 + 1
  * For more information see https://github.com/zolkko/blumenplace-uc/wiki/SHT1X-CRC-8-calculation
  */
@@ -553,8 +569,9 @@ const static uint8_t crc8_lut[] = {
 	130, 179, 224, 209, 70,  119, 36,  21,  59,  10,  89,  104, 255, 206, 157, 172
 };
 
-/**
+/*
  * Temperature calculation coefficients
+ * These values were taken from sht1x datasheet.
  */
 static const float temperature_d1 = -39.6f;
 
@@ -573,21 +590,26 @@ static const float moisture_highres_c3 = -1.5955e-6;
 static const float moisture_lowres_c3 = -4.0845e-4;
 
 
+static sht1x_device_t device;
+
+
 static uint8_t sht1x_reverse_bits(uint8_t value);
 
 static uint8_t sht1x_crc(uint8_t * data, size_t data_len, uint8_t initial_crc);
 
-static void sht1x_debug_toggle(void);
-
 static void sht1x_udma_set_buffer(void * data, uint32_t transfer_size);
-
-static void sht1x_gpio_init(void);
 
 static void sht1x_timer_start(void);
 
 static void sht1x_timer_stop(void);
 
-static void sht1x_timer_init(void);
+
+static inline void sht1x_gpio_init(void);
+
+static inline void sht1x_timer_init(void);
+
+static inline void sht1x_udma_init(void);
+
 
 static void sht1x_udma_set_buffer(void * data, uint32_t transfer_size);
 
@@ -604,185 +626,11 @@ static sht1x_error_t sht1x_sensor_read(uint8_t command, const uint8_t * command_
 static void sht1x_process();
 
 
-inline void sht1x_debug_toggle(void)
-{
-	uint32_t dv = GPIOPinRead(SHT1X_PORT_BASE, DEBUG_PIN);
-	if (dv) {
-		GPIOPinWrite(SHT1X_PORT_BASE, DEBUG_PIN, 0x00);
-	} else {
-		GPIOPinWrite(SHT1X_PORT_BASE, DEBUG_PIN, DEBUG_PIN);
-	}
-}
+static inline void sht1x_gpio_reset_pins(void);
 
+static inline void sht1x_gpio_interrupt_enable();
 
-inline void sht1x_enable_interrupt()
-{
-	GPIOIntClear(SHT1X_PORT_BASE, SHT1X_DATA_INTERRUPT);
-	GPIOIntEnable(SHT1X_PORT_BASE, SHT1X_DATA_INTERRUPT);
-}
-
-
-inline void sht1x_disable_interrupt()
-{
-	GPIOIntDisable(SHT1X_PORT_BASE, SHT1X_DATA_INTERRUPT);
-}
-
-
-static sht1x_device_t device;
-
-/**
- * Initialize GPIO port to support SHT1X I/O operations.
- * Data pin is set in weak pull-up configuration.
- */
-void sht1x_gpio_init(void)
-{
-	SysCtlPeripheralEnable(SHT1X_GPIO_PERIPH);
-
-	GPIOPinTypeGPIOOutput(SHT1X_PORT_BASE, SHT1X_CLOCK_PIN);
-	GPIOPinWrite(SHT1X_PORT_BASE, SHT1X_CLOCK_PIN, 0x00);
-
-	GPIODirModeSet(SHT1X_PORT_BASE, SHT1X_DATA_OUT_PIN, GPIO_DIR_MODE_OUT);
-	GPIOPadConfigSet(SHT1X_PORT_BASE, SHT1X_DATA_OUT_PIN, GPIO_STRENGTH_2MA, GPIO_PIN_TYPE_STD_WPU);
-	GPIOPinWrite(SHT1X_PORT_BASE, SHT1X_DATA_OUT_PIN, SHT1X_DATA_OUT_PIN);
-
-	GPIOPinTypeGPIOInput(SHT1X_PORT_BASE, SHT1X_DATA_IN_PIN);
-	GPIOIntTypeSet(SHT1X_PORT_BASE, SHT1X_DATA_IN_PIN, GPIO_FALLING_EDGE);
-	sht1x_disable_interrupt();
-
-	GPIOPinTypeGPIOOutput(SHT1X_PORT_BASE, DEBUG_PIN);
-	GPIOPinWrite(SHT1X_PORT_BASE, DEBUG_PIN, DEBUG_PIN);
-
-	IntEnable(SHT1X_GPIO_INTERRUPT);
-}
-
-
-void sht1x_timer_start(void)
-{
-	TimerIntClear(SHT1X_TIMER_BASE, TIMER_TIMA_TIMEOUT);
-	TimerIntEnable(SHT1X_TIMER_BASE, TIMER_TIMA_TIMEOUT);
-	TimerEnable(SHT1X_TIMER_BASE, SHT1X_TIMER);
-}
-
-
-void sht1x_timer_stop(void)
-{
-	TimerIntDisable(SHT1X_TIMER_BASE, TIMER_TIMA_TIMEOUT);
-	TimerIntClear(SHT1X_TIMER_BASE, TIMER_TIMA_TIMEOUT);
-	TimerDisable(SHT1X_TIMER_BASE, SHT1X_TIMER);
-}
-
-
-void sht1x_timer_init(void)
-{
-	SysCtlPeripheralEnable(SHT1X_TIMER_PERIPH);
-
-	IntDisable(SHT1X_TIMER_INTERRUPT);
-
-	sht1x_timer_stop();
-
-	TimerConfigure(SHT1X_TIMER_BASE, TIMER_CFG_A_PERIODIC);
-	TimerPrescaleSet(SHT1X_TIMER_BASE, SHT1X_TIMER, 0);
-	TimerClockSourceSet(SHT1X_TIMER_BASE, TIMER_CLOCK_SYSTEM);
-	TimerLoadSet(SHT1X_TIMER_BASE, SHT1X_TIMER, SHT1X_CLK_NR);
-
-	TimerDMAEventSet(SHT1X_TIMER_BASE, TIMER_DMA_TIMEOUT_A);
-
-	IntEnable(SHT1X_TIMER_INTERRUPT);
-}
-
-
-void sht1x_udma_init(void)
-{
-	SysCtlPeripheralEnable(SHT1X_UDMA_PERIPH);
-
-	uDMAEnable();
-	uDMAControlBaseSet(UDMA_CTL_TBL);
-
-	IntEnable(INT_UDMAERR);
-
-	uDMAChannelAttributeEnable(SHT1X_UDMA_CHANNEL, UDMA_ATTR_USEBURST);
-	uDMAChannelAttributeDisable(SHT1X_UDMA_CHANNEL, UDMA_ATTR_ALTSELECT | UDMA_ATTR_HIGH_PRIORITY | UDMA_ATTR_REQMASK);
-}
-
-
-void sht1x_udma_set_buffer(void * data, uint32_t transfer_size)
-{
-	uDMAChannelControlSet(SHT1X_UDMA_CHANNEL | UDMA_PRI_SELECT, UDMA_SIZE_8 | UDMA_SRC_INC_8 | UDMA_DST_INC_NONE | UDMA_ARB_2);
-	uDMAChannelTransferSet(SHT1X_UDMA_CHANNEL | UDMA_PRI_SELECT, UDMA_MODE_BASIC, data, SHT1X_DST_ADDRESS, transfer_size);
-
-	uDMAIntClear(SHT1X_UDMA_CH_NUM);
-	uDMAChannelEnable(SHT1X_UDMA_CHANNEL);
-}
-
-
-void sht1x_command_prepare(const uint8_t * command, size_t command_size)
-{
-	memcpy(device.cmd, trans_start_pattern, sizeof(trans_start_pattern));
-	memcpy(&device.cmd[sizeof(trans_start_pattern)], command, command_size);
-}
-
-/**
- * shape output signal using value provided
- */
-void sht1x_command_payload_prepare(uint8_t * buffer, uint8_t value)
-{
-	uint8_t mask;
-	uint8_t data_value = 0;
-
-	for (mask = 0x80; mask; mask >>= 1) {
-		*buffer++ = data_value;
-
-		data_value = value & mask ? SHT1X_DATA_OUT_PIN : 0x00;
-		*buffer++ = data_value;
-
-		*buffer++ = data_value;
-		*buffer++ = data_value | SHT1X_CLOCK_PIN;
-	}
-}
-
-
-void sht1x_device_state_prepare(sht1x_sidx_t next_state)
-{
-	device.data = 0;
-	device.crc = 0;
-	device.state = next_state;
-	device.error = SHT1X_ERROR_OK;
-}
-
-
-sht1x_error_t sht1x_sensor_read(uint8_t command, const uint8_t * command_pattern, size_t command_pattern_size, uint16_t * sensor_output)
-{
-	sht1x_error_t result = SHT1X_ERROR_BUSY;
-
-	if (xSemaphoreTake(device.lock, portMAX_DELAY) == pdTRUE) {
-		sht1x_disable_interrupt();
-
-		sht1x_command_prepare(command_pattern, command_pattern_size);
-		sht1x_device_state_prepare(SHT1X_SIDX_SENSOR_FIN);
-
-		sht1x_udma_set_buffer((void *)device.cmd, sizeof(trans_start_pattern) + command_pattern_size);
-		TimerLoadSet(SHT1X_TIMER_BASE, SHT1X_TIMER, SHT1X_CLK_NR);
-		sht1x_timer_start();
-
-		if (xSemaphoreTake(device.interrupt_semaphore, portMAX_DELAY) == pdTRUE) {
-			result = device.error;
-			if (result == SHT1X_ERROR_OK) {
-				uint8_t data[] = {command, (device.data >> 8) & 0xff, device.data & 0xff, sht1x_reverse_bits(device.crc)};
-				uint8_t crc = sht1x_crc(data, sizeof(data), device.crc_init);
-				if (crc == 0) {
-					if (sensor_output != NULL) {
-						*sensor_output = device.data;
-					}
-				} else {
-					result = SHT1X_ERROR_INVALID_CRC;
-				}
-			}
-		}
-
-		xSemaphoreGive(device.lock);
-	}
-	return result;
-}
+static inline void sht1x_gpio_interrupt_disable();
 
 
 sht1x_error_t sht1x_temperature_read(float * temperature)
@@ -818,8 +666,6 @@ sht1x_error_t sht1x_status_write(uint8_t status)
 		sht1x_command_payload_prepare(device.cmd_payload, status & SHT1X_SREG_bm);
 		sht1x_device_state_prepare(SHT1X_SIDX_SREGW_FIN);
 
-		sht1x_disable_interrupt();
-
 		sht1x_udma_set_buffer(device.cmd, sizeof(trans_start_pattern) + sizeof(sreg_write_pattern));
 
 		TimerLoadSet(SHT1X_TIMER_BASE, SHT1X_TIMER, SHT1X_CLK_NR);
@@ -844,8 +690,6 @@ sht1x_error_t sht1x_status_read(uint8_t * status)
 	if (xSemaphoreTake(device.lock, portMAX_DELAY) == pdTRUE) {
 		sht1x_command_prepare(sreg_read_pattern, sizeof(sreg_read_pattern));
 		sht1x_device_state_prepare(SHT1X_SIDX_SREGR_FIN);
-
-		sht1x_disable_interrupt();
 
 		sht1x_udma_set_buffer((void *) device.cmd, sizeof(trans_start_pattern) + sizeof(sreg_read_pattern));
 
@@ -885,8 +729,6 @@ sht1x_error_t sht1x_software_reset(void)
 		sht1x_command_prepare(soft_reset_pattern, sizeof(soft_reset_pattern));
 		sht1x_device_state_prepare(SHT1X_SIDX_SOFT_RESET_FIN);
 
-		sht1x_disable_interrupt();
-
 		sht1x_udma_set_buffer((void *) device.cmd, sizeof(trans_start_pattern) + sizeof(sreg_read_pattern));
 
 		TimerLoadSet(SHT1X_TIMER_BASE, SHT1X_TIMER, SHT1X_CLK_NR);
@@ -905,9 +747,209 @@ sht1x_error_t sht1x_software_reset(void)
 }
 
 
-inline void sht1x_transmission_done(void)
+void sht1x_init(void)
 {
-	sht1x_disable_interrupt();
+	device.lock = xSemaphoreCreateMutex();
+	device.interrupt_semaphore = xSemaphoreCreateBinary();
+
+	device.status = SHT1X_DEFAULT_STATUS;
+	device.crc_init = SHT1X_DEFAULT_CRC_INIT;
+	device.error = SHT1X_ERROR_UNKNOWN;
+
+	sht1x_gpio_init();
+
+	sht1x_timer_init();
+	sht1x_udma_init();
+}
+
+/*
+ * Initialize GPIO port to support SHT1X I/O operations.
+ * Data pin is set in weak pull-up configuration.
+ *
+ * Unlike AVR the TM4C123 does not allow to read actual logic level from
+ * output pins. That is why an addition SHT1X_DATA_IN_PIN is used.
+ */
+void sht1x_gpio_init(void)
+{
+	SysCtlPeripheralEnable(SHT1X_GPIO_PERIPH);
+
+	GPIOIntDisable(SHT1X_PORT_BASE, SHT1X_DATA_INTERRUPT);
+
+	GPIOPinTypeGPIOOutput(SHT1X_PORT_BASE, SHT1X_CLOCK_PIN);
+	GPIOPinWrite(SHT1X_PORT_BASE, SHT1X_CLOCK_PIN, 0x00);
+
+	GPIODirModeSet(SHT1X_PORT_BASE, SHT1X_DATA_OUT_PIN, GPIO_DIR_MODE_OUT);
+	GPIOPadConfigSet(SHT1X_PORT_BASE, SHT1X_DATA_OUT_PIN, GPIO_STRENGTH_2MA, GPIO_PIN_TYPE_STD_WPU);
+	GPIOPinWrite(SHT1X_PORT_BASE, SHT1X_DATA_OUT_PIN, SHT1X_DATA_OUT_PIN);
+
+	GPIOPinTypeGPIOInput(SHT1X_PORT_BASE, SHT1X_DATA_IN_PIN);
+	GPIOIntTypeSet(SHT1X_PORT_BASE, SHT1X_DATA_IN_PIN, GPIO_FALLING_EDGE);
+
+	IntEnable(SHT1X_GPIO_INTERRUPT);
+}
+
+/*
+ * Initializes timer to trigger an overflow interrupt every 1/SHT1X_CLOCK_HZ seconds.
+ * The function also configures uDMA to trigger timer's interrupt handler.
+ *
+ * If uDMA is enabled and its transaction is in progress it blocks normal interrupt
+ * flow of the timer.
+ */
+void sht1x_timer_init(void)
+{
+	SysCtlPeripheralEnable(SHT1X_TIMER_PERIPH);
+
+	IntDisable(SHT1X_TIMER_INTERRUPT);
+	TimerIntDisable(SHT1X_TIMER_BASE, TIMER_TIMA_TIMEOUT);
+	TimerDisable(SHT1X_TIMER_BASE, SHT1X_TIMER);
+
+	TimerConfigure(SHT1X_TIMER_BASE, TIMER_CFG_A_PERIODIC);
+	TimerPrescaleSet(SHT1X_TIMER_BASE, SHT1X_TIMER, 0);
+	TimerClockSourceSet(SHT1X_TIMER_BASE, TIMER_CLOCK_SYSTEM);
+	TimerLoadSet(SHT1X_TIMER_BASE, SHT1X_TIMER, SHT1X_CLK_NR);
+
+	TimerDMAEventSet(SHT1X_TIMER_BASE, TIMER_DMA_TIMEOUT_A);
+
+	TimerIntClear(SHT1X_TIMER_BASE, TIMER_TIMA_TIMEOUT);
+	IntEnable(SHT1X_TIMER_INTERRUPT);
+}
+
+/*
+ * The function enables and configures uDMA channel in burst mode
+ * because the timer module supports only this type of transfer.
+ */
+void sht1x_udma_init(void)
+{
+	SysCtlPeripheralEnable(SHT1X_UDMA_PERIPH);
+
+	uDMAEnable();
+	uDMAControlBaseSet(UDMA_CTL_TBL);
+
+	IntEnable(INT_UDMAERR);
+
+	uDMAChannelAttributeEnable(SHT1X_UDMA_CHANNEL, UDMA_ATTR_USEBURST);
+	uDMAChannelAttributeDisable(SHT1X_UDMA_CHANNEL, UDMA_ATTR_ALTSELECT | UDMA_ATTR_HIGH_PRIORITY | UDMA_ATTR_REQMASK);
+}
+
+
+sht1x_error_t sht1x_sensor_read(uint8_t command, const uint8_t * command_pattern, size_t command_pattern_size, uint16_t * sensor_output)
+{
+	sht1x_error_t result = SHT1X_ERROR_BUSY;
+
+	if (xSemaphoreTake(device.lock, portMAX_DELAY) == pdTRUE) {
+		sht1x_command_prepare(command_pattern, command_pattern_size);
+		sht1x_device_state_prepare(SHT1X_SIDX_SENSOR_FIN);
+
+		sht1x_udma_set_buffer((void *)device.cmd, sizeof(trans_start_pattern) + command_pattern_size);
+		TimerLoadSet(SHT1X_TIMER_BASE, SHT1X_TIMER, SHT1X_CLK_NR);
+		sht1x_timer_start();
+
+		if (xSemaphoreTake(device.interrupt_semaphore, portMAX_DELAY) == pdTRUE) {
+			result = device.error;
+			if (result == SHT1X_ERROR_OK) {
+				uint8_t data[] = {command, (device.data >> 8) & 0xff, device.data & 0xff, sht1x_reverse_bits(device.crc)};
+				uint8_t crc = sht1x_crc(data, sizeof(data), device.crc_init);
+				if (crc == 0) {
+					if (sensor_output != NULL) {
+						*sensor_output = device.data;
+					}
+				} else {
+					result = SHT1X_ERROR_INVALID_CRC;
+				}
+			}
+		}
+
+		xSemaphoreGive(device.lock);
+	}
+	return result;
+}
+
+/*
+ * Sets CLOCK line low and DATA line high.
+ */
+void sht1x_gpio_reset_pins(void)
+{
+	GPIOPinWrite(SHT1X_PORT_BASE, SHT1X_BOTH_PINS, SHT1X_DATA_OUT_PIN);
+}
+
+
+static inline void sht1x_gpio_interrupt_enable()
+{
+	GPIOIntClear(SHT1X_PORT_BASE, SHT1X_DATA_INTERRUPT);
+	GPIOIntEnable(SHT1X_PORT_BASE, SHT1X_DATA_INTERRUPT);
+}
+
+
+static inline void sht1x_gpio_interrupt_disable()
+{
+	GPIOIntDisable(SHT1X_PORT_BASE, SHT1X_DATA_INTERRUPT);
+}
+
+
+void sht1x_timer_start(void)
+{
+	TimerIntClear(SHT1X_TIMER_BASE, TIMER_TIMA_TIMEOUT);
+	TimerIntEnable(SHT1X_TIMER_BASE, TIMER_TIMA_TIMEOUT);
+	TimerEnable(SHT1X_TIMER_BASE, SHT1X_TIMER);
+}
+
+
+void sht1x_timer_stop(void)
+{
+	TimerIntDisable(SHT1X_TIMER_BASE, TIMER_TIMA_TIMEOUT);
+	TimerIntClear(SHT1X_TIMER_BASE, TIMER_TIMA_TIMEOUT);
+	TimerDisable(SHT1X_TIMER_BASE, SHT1X_TIMER);
+}
+
+
+void sht1x_udma_set_buffer(void * data, uint32_t transfer_size)
+{
+	uDMAChannelControlSet(SHT1X_UDMA_CHANNEL | UDMA_PRI_SELECT, UDMA_SIZE_8 | UDMA_SRC_INC_8 | UDMA_DST_INC_NONE | UDMA_ARB_2);
+	uDMAChannelTransferSet(SHT1X_UDMA_CHANNEL | UDMA_PRI_SELECT, UDMA_MODE_BASIC, data, SHT1X_DST_ADDRESS, transfer_size);
+
+	uDMAIntClear(SHT1X_UDMA_CH_NUM);
+	uDMAChannelEnable(SHT1X_UDMA_CHANNEL);
+}
+
+
+void sht1x_command_prepare(const uint8_t * command, size_t command_size)
+{
+	memcpy(device.cmd, trans_start_pattern, sizeof(trans_start_pattern));
+	memcpy(&device.cmd[sizeof(trans_start_pattern)], command, command_size);
+}
+
+/*
+ * shape output signal using value provided
+ */
+void sht1x_command_payload_prepare(uint8_t * buffer, uint8_t value)
+{
+	uint8_t mask;
+	uint8_t data_value = 0;
+
+	for (mask = 0x80; mask; mask >>= 1) {
+		*buffer++ = data_value;
+
+		data_value = value & mask ? SHT1X_DATA_OUT_PIN : 0x00;
+		*buffer++ = data_value;
+
+		*buffer++ = data_value;
+		*buffer++ = data_value | SHT1X_CLOCK_PIN;
+	}
+}
+
+
+void sht1x_device_state_prepare(sht1x_sidx_t next_state)
+{
+	device.data = 0;
+	device.crc = 0;
+	device.state = next_state;
+	device.error = SHT1X_ERROR_OK;
+}
+
+
+static inline void sht1x_transmission_done(void)
+{
+	sht1x_gpio_interrupt_disable();
 	sht1x_timer_stop();
 	GPIOPinWrite(SHT1X_PORT_BASE, SHT1X_BOTH_PINS, SHT1X_DATA_OUT_PIN);
 	xSemaphoreGiveFromISR(device.interrupt_semaphore, NULL);
@@ -916,8 +958,6 @@ inline void sht1x_transmission_done(void)
 
 void sht1x_process()
 {
-	sht1x_debug_toggle();
-
 	const sht1x_state_t * state = &states[device.state];
 
 	uint32_t cur_output = state->output;
@@ -933,7 +973,6 @@ void sht1x_process()
 			break;
 
 		case SHT1X_STATE_OUTPUT_PAYLOAD:
-			//TimerIntDisable(SHT1X_TIMER_BASE, TIMER_TIMA_TIMEOUT);
 			sht1x_timer_stop();
 			sht1x_udma_set_buffer(device.cmd_payload, SHT1X_PAYLOAD_BUFFER_SIZE);
 			TimerLoadSet(SHT1X_TIMER_BASE, SHT1X_TIMER, SHT1X_CLK_NR);
@@ -980,12 +1019,12 @@ void sht1x_process()
 			sht1x_timer_stop();
 			TimerLoadSet(SHT1X_TIMER_BASE, SHT1X_TIMER, SHT1X_CLK_LO);
 			sht1x_timer_start();
-			sht1x_enable_interrupt();
+			sht1x_gpio_interrupt_enable();
 			GPIOPinWrite(SHT1X_PORT_BASE, SHT1X_CLOCK_PIN, 0x00);
 			break;
 
 		case SHT1X_STATE_OUTPUT_WAIT_READY:
-			sht1x_disable_interrupt();
+			sht1x_gpio_interrupt_disable();
 			GPIOPinWrite(SHT1X_PORT_BASE, SHT1X_BOTH_PINS, SHT1X_DATA_OUT_PIN);
 			sht1x_timer_stop();
 			TimerLoadSet(SHT1X_TIMER_BASE, SHT1X_TIMER, SHT1X_CLK_NR);
@@ -1038,7 +1077,8 @@ void udma_error_isr_handler(void)
 		uDMAErrorStatusClear();
 	}
 
-	xSemaphoreGiveFromISR(device.interrupt_semaphore, NULL);
+	device.error = SHT1X_ERROR_UDMA_FAILURE;
+	sht1x_transmission_done();
 }
 
 
@@ -1064,21 +1104,4 @@ uint8_t sht1x_crc(uint8_t * data, size_t data_len, uint8_t initial_crc)
 		data_len--;
 	}
 	return crc;
-}
-
-/**
- * TODO: move to HW specific module
- */
-void sht1x_init(void)
-{
-	device.lock = xSemaphoreCreateMutex();
-	device.interrupt_semaphore = xSemaphoreCreateBinary();
-
-	device.status = SHT1X_DEFAULT_STATUS;
-	device.crc_init = SHT1X_DEFAULT_CRC_INIT;
-
-	sht1x_gpio_init();
-
-	sht1x_timer_init();
-	sht1x_udma_init();
 }
