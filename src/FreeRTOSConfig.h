@@ -1,6 +1,8 @@
 #ifndef FREERTOSCONFIG_H_
 #define FREERTOSCONFIG_H_
 
+#define configUSE_CCx_CC1201                    1
+#define configSHT1X_CLOCK_HZ					200000
 
 #define configUSE_PREEMPTION                    1
 #define configUSE_PORT_OPTIMISED_TASK_SELECTION 0

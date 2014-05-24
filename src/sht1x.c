@@ -77,7 +77,12 @@
 
 #define SHT1X_TIMER_INTERRUPT	INT_TIMER0A
 
+#ifndef configSHT1X_CLOCK_HZ
+#warning configSHT1X_CLOCK_HZ is undefined. Defaults to 200kHz.
 #define SHT1X_CLOCK_HZ			200000
+#else
+#define SHT1X_CLOCK_HZ			configSHT1X_CLOCK_HZ
+#endif
 
 /* Timer normal speed  */
 #define SHT1X_CLK_NR			(configCPU_CLOCK_HZ / (SHT1X_CLOCK_HZ * 2))

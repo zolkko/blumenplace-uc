@@ -135,9 +135,9 @@ extern "C" {
 #define CCx_TXFIFO							(0x3F)
 #define CCx_RXFIFO							(0x3F)
 
-#ifdef USE_CCx_CC1101
+#ifdef configUSE_CCx_CC1101
 #define CCx_FIFO_SIZE						(0x40)	/* 64 bytes for cc1101 */
-#elif USE_CCx_CC1201
+#elif configUSE_CCx_CC1201
 #define CCx_FIFO_SIZE						(0x80)	/* 64 bytes for cc1201 */
 #else
 #error Please define either USE_CCx_CC1101 or USE_CCx_CC1201
