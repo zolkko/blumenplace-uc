@@ -140,7 +140,7 @@ extern "C" {
 #elif configUSE_CCx_CC1201
 #define CCx_FIFO_SIZE						(0x80)	/* 64 bytes for cc1201 */
 #else
-#error Please define either USE_CCx_CC1101 or USE_CCx_CC1201
+// #error Please define either USE_CCx_CC1101 or USE_CCx_CC1201
 #endif
 
 #define CCx_PACKT_LEN						(CCx_FIFO_SIZE - 3)
