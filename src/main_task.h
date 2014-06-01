@@ -1,5 +1,9 @@
-#ifndef MAIN_TASK_H_
-#define MAIN_TASK_H_
+#ifndef __main_task_h__
+#define __main_task_h__
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #define MAIN_TASK_NAME     "main-task"
 #define MAIN_TASK_STACK    512
@@ -7,4 +11,8 @@
 
 void main_task(void *);
 
-#endif /* MAIN_TASK_H_ */
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* __main_task_h__ */

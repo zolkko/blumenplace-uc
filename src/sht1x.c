@@ -43,7 +43,7 @@
 #include <semphr.h>
 
 #include "sht1x.h"
-#include "hw_udma_tbl.h"
+
 
 /*
  * GPIO PORT Settings
@@ -825,12 +825,12 @@ void sht1x_timer_init(void)
  */
 void sht1x_udma_init(void)
 {
-	SysCtlPeripheralEnable(SHT1X_UDMA_PERIPH);
+	/*SysCtlPeripheralEnable(SHT1X_UDMA_PERIPH);
 
 	uDMAEnable();
 	uDMAControlBaseSet(UDMA_CTL_TBL);
 
-	IntEnable(INT_UDMAERR);
+	IntEnable(INT_UDMAERR);*/
 
 	uDMAChannelAttributeEnable(SHT1X_UDMA_CHANNEL, UDMA_ATTR_USEBURST);
 	uDMAChannelAttributeDisable(SHT1X_UDMA_CHANNEL, UDMA_ATTR_ALTSELECT | UDMA_ATTR_HIGH_PRIORITY | UDMA_ATTR_REQMASK);
@@ -1072,7 +1072,7 @@ void gpioe_isr_handler(void)
 }
 
 
-void udma_error_isr_handler(void)
+/*void udma_error_isr_handler(void)
 {
 	uint32_t udma_error = uDMAErrorStatusGet();
 	uint32_t udma_status = uDMAIntStatus();
@@ -1084,7 +1084,7 @@ void udma_error_isr_handler(void)
 
 	device.error = SHT1X_ERROR_UDMA_FAILURE;
 	sht1x_transmission_done();
-}
+}*/
 
 
 uint8_t sht1x_reverse_bits(uint8_t value)

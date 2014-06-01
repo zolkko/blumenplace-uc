@@ -26,6 +26,7 @@ DEFINE_ISR(timer0a_isr_handler)
 DEFINE_ISR(udma_software_isr_handler)
 DEFINE_ISR(udma_error_isr_handler)
 DEFINE_ISR(gpioe_isr_handler)
+DEFINE_ISR(ssi0_isr_handler)
 
 
 /**
@@ -72,7 +73,7 @@ void (* const g_pfnVectors[])(void) =
     gpioe_isr_handler,                      // GPIO Port E
     default_isr_handler,                    // UART0 Rx and Tx
     default_isr_handler,                    // UART1 Rx and Tx
-    default_isr_handler,                    // SSI0 Rx and Tx
+    ssi0_isr_handler,	                    // SSI0 Rx and Tx
     default_isr_handler,                    // I2C0 Master and Slave
     default_isr_handler,                    // PWM Fault
     default_isr_handler,                    // PWM Generator 0
