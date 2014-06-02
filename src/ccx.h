@@ -252,10 +252,8 @@ extern "C" {
 #define CCx_MARC_RXTX_SWITCH_gc				(0x15)
 #define CCx_MARC_TXFIFO_UNDERFLOW_gc		(0x16)
 
-
 #ifdef __cplusplus
 }
 #endif
-
 
 #endif /* __ccx_h__ */

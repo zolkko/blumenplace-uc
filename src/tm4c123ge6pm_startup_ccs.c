@@ -25,7 +25,10 @@ extern void xPortSysTickHandler(void);
 DEFINE_ISR(timer0a_isr_handler)
 DEFINE_ISR(udma_software_isr_handler)
 DEFINE_ISR(udma_error_isr_handler)
+
 DEFINE_ISR(gpioe_isr_handler)
+DEFINE_ISR(gpioa_isr_handler)
+
 DEFINE_ISR(ssi0_isr_handler)
 
 
@@ -66,7 +69,7 @@ void (* const g_pfnVectors[])(void) =
     0,                                      // Reserved
     xPortPendSVHandler,                     // The PendSV handler
     xPortSysTickHandler,                    // The SysTick handler
-    default_isr_handler,                    // GPIO Port A
+    gpioa_isr_handler,                      // GPIO Port A
     default_isr_handler,                    // GPIO Port B
     default_isr_handler,                    // GPIO Port C
     default_isr_handler,                    // GPIO Port D

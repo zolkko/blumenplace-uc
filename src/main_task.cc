@@ -17,6 +17,7 @@
 #include "dma_svc.h"
 #include "ssi_svc.h"
 #include "arch/tm4c123g/ssi_svc_hw.h"
+#include "ccx.hpp"
 
 
 extern dma_svc_t dma_svc0;
