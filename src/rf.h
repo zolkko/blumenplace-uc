@@ -1,6 +1,7 @@
 #ifndef __rh_h__
 #define __rh_h__
 
+/*
 class rf_t {
 private:
 	ccx_hw_t& hw;
@@ -18,7 +19,6 @@ public:
 	int8_t receive(uint8_t * data, uint8_t * data_size, uint8_t * src_addr, uint8_t * dst_addr);
 	uint8_t can_receive(portTickType ticks);
 
-	/* write a packet into transceiver buffer */
 	int8_t prepare(const void * payload, uint8_t payload_len);
 	int8_t transmit();
 	int8_t send(const void * payload, uint8_t payload_len);
@@ -34,6 +34,6 @@ public:
 
 	uint8_t sleep();
 };
-
+*/
 
 #endif /* __rh_h__ */

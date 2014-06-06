@@ -16,6 +16,7 @@
 
 #include <vector>
 
+/*
 class gpio_listener_t {
 protected:
 	virtual void handle_isr(uint32_t status, uint32_t value) = 0;
@@ -69,7 +70,7 @@ private:
 	void operator=(const gpio_intctrl_t&) {
 	}
 };
-
+*/
 
 /*template<uint32_t Base>
 class gpio_pin_t : public gpio_listener_t {

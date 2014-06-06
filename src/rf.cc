@@ -2,7 +2,7 @@
 #include <stdbool.h>
 #include "rf.h"
 
-
+/*
 uint8_t rf_t::version(void) {
 	while (!acquire_lock()) ;
 
@@ -17,3 +17,4 @@ uint8_t rf_t::version(void) {
 
 	return version;
 }
+*/

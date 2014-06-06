@@ -12,5 +12,5 @@
 
 void gpioa_isr_handler(void)
 {
-	gpio_intctrl_t<GPIO_PORTA_BASE>::get().handle_isr();
+	// gpio_intctrl_t<GPIO_PORTA_BASE>::get().handle_isr();
 }

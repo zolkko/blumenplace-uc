@@ -2,7 +2,7 @@
 #ifndef __gpio_intctrl_h__
 #define __gpio_intctrl_h__
 
-
+/*
 class gpio_listener_t {
 public:
 	virtual void handle_isr(uint32_t status, uint32_t value) = 0;
@@ -79,5 +79,6 @@ private:
 private:
 	gpio_listener_vector_t listeners[8];
 };
+*/
 
 #endif /* __gpio_intctrl_h__ */

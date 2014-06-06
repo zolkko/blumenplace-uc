@@ -22,7 +22,7 @@
 
 extern dma_svc_t dma_svc0;
 
-extern ssi_hw_t ssi0_svc;
+// extern ssi_hw_t ssi0_svc;
 
 
 void main_task(void * params)
@@ -35,7 +35,7 @@ void main_task(void * params)
 	uint8_t expect;
 	float value;
 
-	ssi_svc_init((ssi_svc_t *) &ssi0_svc, &dma_svc0);
+	/*ssi_svc_init((ssi_svc_t *) &ssi0_svc, &dma_svc0);
 	ssi_svc_flush((ssi_svc_t *) &ssi0_svc);
 
 	uint8_t out_data[20];
@@ -44,13 +44,13 @@ void main_task(void * params)
 	uint8_t i;
 	for (i = 0; i < sizeof(out_data); i++) {
 		out_data[i] = 0;
-	}
+	}*/
 
 	while (true) {
-		ssi_svc_select((ssi_svc_t *) &ssi0_svc);
+		/*ssi_svc_select((ssi_svc_t *) &ssi0_svc);
 		// data = ssi_svc_send((ssi_svc_t *) &ssi0_svc, 0xaa);
 		ssi_svc_transceive((ssi_svc_t *) &ssi0_svc, out_data, in_data, sizeof(in_data));
-		ssi_svc_release((ssi_svc_t *) &ssi0_svc);
+		ssi_svc_release((ssi_svc_t *) &ssi0_svc);*/
 
 		//printf("Output: %d\n", data);
 		/*for (expect = 0; expect < 8; expect++) {
