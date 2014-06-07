@@ -18,7 +18,7 @@
 
 #include "dma_dev.h"
 
-
+/*
 #ifdef ccs
 #pragma DATA_ALIGN(UDMA_CTL_TBL, 1024)
 static uint8_t CTL_TBL[1024];
@@ -30,7 +30,7 @@ static uint8_t CTL_TBL[1024] __attribute__ ((aligned(1024)));
 void udma_error_isr_handler(void)
 {
 	dma_dev_t::get().handle_error_isr();
-}
+}*/
 
 
 void dma_dev_t::handle_error_isr(void)
@@ -59,7 +59,7 @@ dma_dev_t::dma_dev_t()
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_UDMA);
 
 	uDMAEnable();
-	uDMAControlBaseSet(CTL_TBL);
+	//uDMAControlBaseSet(CTL_TBL);
 
 	// initialize SSI0 channel
 	uDMAChannelAttributeDisable(UDMA_CHANNEL_SSI0RX, UDMA_ATTR_ALTSELECT | UDMA_ATTR_USEBURST | UDMA_ATTR_HIGH_PRIORITY | UDMA_ATTR_REQMASK);

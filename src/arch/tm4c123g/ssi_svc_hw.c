@@ -49,7 +49,7 @@ ssi_hw_t ssi0_svc = {
 };
 
 
-void ssi0_isr_handler(void)
+/*void ssi0_isr_handler(void)
 {
 	static BaseType_t task_woken;
 	uint32_t msk_status = HWREG(ssi0_svc.ssi_base + SSI_O_MIS);
@@ -68,7 +68,7 @@ void ssi0_isr_handler(void)
 	if (task_woken != pdFALSE) {
 		portYIELD_FROM_ISR(task_woken);
 	}
-}
+}*/
 
 
 /*

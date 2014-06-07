@@ -19,32 +19,59 @@
 #include "arch/tm4c123g/ssi_svc_hw.h"
 #include "ccx.hpp"
 
+#include "driverlib/interrupt.h"
+#include <vector>
+
+#include "driverlib/ssi.h"
+#include "driverlib/gpio.h"
+#include "driverlib/udma.h"
+#include "driverlib/sysctl.h"
+
+#include "dma_svc.h"
+#include "gpio_pin.h"
+#include "gpio_port.h"
+#include "ssi_dev.h"
+
 
 extern dma_svc_t dma_svc0;
-
-// extern ssi_hw_t ssi0_svc;
 
 
 void main_task(void * params)
 {
-	dma_svc_init(&dma_svc0);
-
-	sht1x_init();
-
-	uint8_t data;
-	uint8_t expect;
-	float value;
-
-	/*ssi_svc_init((ssi_svc_t *) &ssi0_svc, &dma_svc0);
-	ssi_svc_flush((ssi_svc_t *) &ssi0_svc);
-
 	uint8_t out_data[20];
 	uint8_t in_data[20];
 
 	uint8_t i;
 	for (i = 0; i < sizeof(out_data); i++) {
-		out_data[i] = 0;
-	}*/
+		out_data[i] = i;
+	}
+
+	dma_svc_init(&dma_svc0);
+	ssi_dev_t<SSI0_BASE> ssi0(&dma_svc0);
+
+	while (true) {
+		ssi0.flush();
+		ssi0.chip_select();
+		ssi0.send(0xaa);
+		ssi0.chip_release();
+
+		ssi0.flush();
+		ssi0.chip_select();
+		ssi0.transceive(out_data, in_data, sizeof(in_data));
+		ssi0.chip_release();
+	}
+
+	/*
+
+	sht1x_init();
+
+	uint8_t data;
+	uint8_t expect;
+	float value;*/
+
+	/*ssi_svc_init((ssi_svc_t *) &ssi0_svc, &dma_svc0);
+	ssi_svc_flush((ssi_svc_t *) &ssi0_svc);
+*/
 
 	while (true) {
 		/*ssi_svc_select((ssi_svc_t *) &ssi0_svc);
