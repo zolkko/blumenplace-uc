@@ -14,9 +14,6 @@
 #include "sht1x.h"
 #include "ccx.h"
 
-#include "dma_svc.h"
-#include "ssi_svc.h"
-#include "arch/tm4c123g/ssi_svc_hw.h"
 #include "ccx.hpp"
 
 #include "driverlib/interrupt.h"
@@ -27,13 +24,9 @@
 #include "driverlib/udma.h"
 #include "driverlib/sysctl.h"
 
-#include "dma_svc.h"
 #include "gpio_pin.h"
 #include "gpio_port.h"
 #include "ssi_dev.h"
-
-
-extern dma_svc_t dma_svc0;
 
 
 void main_task(void * params)
@@ -46,8 +39,10 @@ void main_task(void * params)
 		out_data[i] = i;
 	}
 
-	dma_svc_init(&dma_svc0);
-	ssi_dev_t<SSI0_BASE> ssi0(&dma_svc0);
+	dma_dev_t& dma = dma_dev_t::get();
+	dma.initialize();
+
+	ssi_dev_t<SSI0_BASE> ssi0(dma);
 
 	while (true) {
 		ssi0.flush();

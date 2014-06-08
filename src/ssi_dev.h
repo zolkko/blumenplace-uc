@@ -3,7 +3,7 @@
 #define __ssi_dev_h__
 
 #include <vector>
-#include "dma_svc.h"
+#include "dma_dev.h"
 
 
 template<uint32_t Base>
@@ -15,8 +15,12 @@ template<>
 class ssi_spec_t<SSI0_BASE> {
 public:
 	static const uint32_t rx_dma_channel = (1 << UDMA_CHANNEL_SSI0RX);
+	static const uint32_t rx_dma_channel_number = UDMA_CHANNEL_SSI0RX;
+
 	static const uint32_t tx_dma_channel = (1 << UDMA_CHANNEL_SSI0TX);
-	static const uint32_t interrupt_num  = INT_SSI0;
+	static const uint32_t tx_dma_channel_number = UDMA_CHANNEL_SSI0TX;
+
+	static const uint32_t interrupt_number  = INT_SSI0;
 
 	static const uint32_t ssi_periph = SYSCTL_PERIPH_SSI0;
 	static const uint32_t gpio_periph = SYSCTL_PERIPH_GPIOA;
@@ -33,18 +37,18 @@ private:
 
 	static ssi_dev_t* device;
 
+	dma_dev_t& dma;
 	SemaphoreHandle_t interrupt_semaphore;
 	SemaphoreHandle_t dev_lock;
-	dma_svc_t* dma_svc;
 
 	void handle_isr(void) {
 		static BaseType_t task_woken;
 
 		uint32_t msk_status = HWREG(Base + SSI_O_MIS);
-		uint32_t dma_status = uDMAIntStatus();
+		uint32_t dma_status = dma.get_interrupt_status();
 
 		HWREG(Base + SSI_O_ICR) = SSI_IM_RORIM | SSI_IM_RTIM;
-		uDMAIntClear(spec.tx_dma_channel | spec.rx_dma_channel);
+		dma.clear_interrupt(spec.tx_dma_channel | spec.rx_dma_channel);
 
 		task_woken = pdFALSE;
 		if (dma_status & spec.tx_dma_channel) {
@@ -64,8 +68,8 @@ public:
 		}
 	}
 
-	ssi_dev_t(dma_svc_t * dma_svc_) : dma_svc(dma_svc_) {
-		IntDisable(spec.interrupt_num);
+	ssi_dev_t(dma_dev_t& dma_) : dma(dma_) {
+		IntDisable(spec.interrupt_number);
 
 		ssi_dev_t::device = this;
 
@@ -83,10 +87,9 @@ public:
 		HWREG(Base + SSI_O_CR1) = SSI_CR1_EOT | SSI_CR1_SSE;	/* Master mode, End of Transmission interrupt mode SSI enabled; */
 		HWREG(Base + SSI_O_DMACTL) = SSI_DMA_TX | SSI_DMA_RX;	/* Enable DMA operations on RX and TX */
 		HWREG(Base + SSI_O_ICR) = SSI_IM_RORIM | SSI_IM_RTIM;	/* Clear interrupts */
+		HWREG(Base + SSI_O_IM) = 0;								/* SSI_IM_TXIM | SSI_IM_RXIM | SSI_IM_RTIM | SSI_IM_RORIM */
 
-		uDMAIntClear(spec.tx_dma_channel | spec.rx_dma_channel);
-
-		HWREG(Base + SSI_O_IM) = 0; //SSI_IM_TXIM | SSI_IM_RXIM | SSI_IM_RTIM | SSI_IM_RORIM;
+		dma.set_attribute(spec.rx_dma_channel | spec.tx_dma_channel, UDMA_ATTRIBUTE_NONE);
 	}
 
 	virtual ~ssi_dev_t() {
@@ -110,17 +113,24 @@ public:
 
 	bool transceive(void * out_data, void * in_data, uint32_t count) {
 		if (xSemaphoreTake(dev_lock, portMAX_DELAY) == pdTRUE) {
-			dma_svc_ssi0_rx(dma_svc, in_data, count);
-			dma_svc_ssi0_tx(dma_svc, out_data, count);
+
+			dma.set_channel_control(spec.rx_dma_channel_number, UDMA_CHCTL_DSTSIZE_8 | UDMA_CHCTL_SRCSIZE_8 | UDMA_CHCTL_SRCINC_NONE |
+					UDMA_CHCTL_DSTINC_8 | UDMA_CHCTL_ARBSIZE_1 | UDMA_CHCTL_XFERMODE_BASIC,
+					(void *)(SSI0_BASE + SSI_O_DR), out_data, count);
+
+			dma.set_channel_control(spec.tx_dma_channel_number, UDMA_CHCTL_DSTSIZE_8 | UDMA_CHCTL_SRCSIZE_8 | UDMA_CHCTL_DSTINC_NONE |
+					UDMA_CHCTL_SRCINC_8 | UDMA_CHCTL_ARBSIZE_1 | UDMA_CHCTL_XFERMODE_BASIC,
+					in_data, (void *)(SSI0_BASE + SSI_O_DR), count);
 
 			HWREG(Base + SSI_O_ICR) = SSI_IM_RORIM | SSI_IM_RTIM;
-			uDMAIntClear(spec.tx_dma_channel | spec.rx_dma_channel);
-			IntEnable(spec.interrupt_num);
-			dma_svc_ssi0_transceive(dma_svc);
+
+			dma.clear_interrupt(spec.tx_dma_channel | spec.rx_dma_channel);
+			IntEnable(spec.interrupt_number);
+			dma.enable_channel(spec.tx_dma_channel | spec.rx_dma_channel);
 
 			xQueueReset(interrupt_semaphore);
 			bool result = xSemaphoreTake(interrupt_semaphore, portMAX_DELAY) == pdTRUE;
-			IntDisable(spec.interrupt_num);
+			IntDisable(spec.interrupt_number);
 
 			xSemaphoreGive(dev_lock);
 			return result;
@@ -146,7 +156,7 @@ public:
 	}
 
 	bool is_busy(bool) {
-		return SSIBusy(Base) || dma_svc_ssi0_busy(dma_svc);
+		return SSIBusy(Base) || dma.is_channel_enabled(spec.rx_dma_channel | spec.tx_dma_channel);
 	}
 };
 
