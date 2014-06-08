@@ -9,8 +9,8 @@
 
 
 typedef struct {
-	volatile void * src_addr;
-	volatile void * dst_addr;
+	volatile void * src_addr_end;
+	volatile void * dst_addr_end;
 	volatile uint32_t control;
 	volatile uint32_t spare;
 } dma_control_table_t;
@@ -135,33 +135,28 @@ public:
 	void set_channel_control(uint32_t channel, uint32_t control, void * src_addr, void *dst_addr, uint32_t transfer_size) {
 		uint32_t inc;
 
-		uint32_t mode = control & UDMA_CHCTL_XFERMODE_M;
 		dma_control_table_t * control_table = (dma_control_table_t *)HWREG(UDMA_CTLBASE);
 
 		channel &= 0x3f;
 
 		// Get the address increment value for the source, from the control word.
 		inc = control & UDMA_CHCTL_SRCINC_M;
-		if (inc != UDMA_CHCTL_SRCINC_NONE) {
-			control_table[channel].src_addr = (void *)((uint32_t)src_addr + (transfer_size << (inc >> 26)) - 1);
+		if (inc == UDMA_CHCTL_SRCINC_NONE) {
+			control_table[channel].src_addr_end = src_addr;
 		} else {
-			control_table[channel].src_addr = src_addr;
+			control_table[channel].src_addr_end = (void *)(&((uint8_t *)src_addr)[(transfer_size << (inc >> 26)) - 1]);
 		}
 
 		// Get the address increment value for the destination, from the control word.
 		inc = control & UDMA_CHCTL_DSTINC_M;
-		if (inc != UDMA_DST_INC_NONE) {
-			if (mode == UDMA_CHCTL_XFERMODE_MEM_SG || mode == UDMA_CHCTL_XFERMODE_MEM_SGA || mode == UDMA_CHCTL_XFERMODE_PER_SG || mode == UDMA_CHCTL_XFERMODE_PER_SGA) {
-				control_table[channel].dst_addr = (void *)&control_table[channel].spare;
-			} else {
-				control_table[channel].dst_addr = (void *)((uint32_t)dst_addr + (transfer_size << (inc >> 30)) - 1);
-			}
+		if (inc == UDMA_CHCTL_DSTINC_NONE) {
+			control_table[channel].dst_addr_end = dst_addr;
 		} else {
-			control_table[channel].dst_addr = dst_addr;
+			control_table[channel].dst_addr_end = (void *)(&((uint8_t *)dst_addr)[(transfer_size << (inc >> 30)) - 1]);
 		}
 
 		// Set the transfer size and mode in the control word (but don't write the control word yet as it could kick off a transfer).
-		control_table[channel].control = control | (((transfer_size - 1) << 4) & UDMA_CHCTL_XFERSIZE_M);;
+		control_table[channel].control = control | ((transfer_size - 1) << 4);
 	}
 
 	bool is_channel_enabled(uint32_t channel_mask) {

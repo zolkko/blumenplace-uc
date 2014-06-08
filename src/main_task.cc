@@ -35,25 +35,39 @@ void main_task(void * params)
 	uint8_t in_data[20];
 
 	uint8_t i;
-	for (i = 0; i < sizeof(out_data); i++) {
-		out_data[i] = i;
-	}
 
 	dma_dev_t& dma = dma_dev_t::get();
 	dma.initialize();
 
 	ssi_dev_t<SSI0_BASE> ssi0(dma);
 
+	ssi0.flush();
 	while (true) {
-		ssi0.flush();
+		for (i = 0; i < sizeof(out_data); i++) {
+			in_data[i] = i;
+			out_data[i] = 0;
+		}
+
 		ssi0.chip_select();
-		ssi0.send(0xaa);
+		uint32_t inp = ssi0.send(0xaa);
 		ssi0.chip_release();
+		printf("ssi0.send 170 = %d\n", inp);
 
 		ssi0.flush();
+
 		ssi0.chip_select();
-		ssi0.transceive(out_data, in_data, sizeof(in_data));
+		ssi0.transceive(in_data, sizeof(in_data), out_data);
+
+		for (i = 0; i < sizeof(in_data); i++) printf("%d ", in_data[i]);
+		printf("\n");
+
+		for (i = 0; i < sizeof(out_data); i++) printf("%d ", out_data[i]);
+		printf("\n");
+
 		ssi0.chip_release();
+
+		printf("------------------\n");
+		vTaskDelay(1000 / portTICK_PERIOD_MS);
 	}
 
 	/*
