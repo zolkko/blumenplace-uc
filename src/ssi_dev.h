@@ -2,7 +2,7 @@
 #ifndef __ssi_dev_h__
 #define __ssi_dev_h__
 
-#include <vector>
+
 #include "dma_dev.h"
 
 
@@ -49,18 +49,21 @@ private:
 		static BaseType_t task_woken;
 
 		uint32_t msk_status = get_interrupt_status();
-		uint32_t raw_status = get_raw_interrupt_status();
 		uint32_t dma_status = dma.get_interrupt_status();
 
 		clear_interrupt(SSI_IM_RORIM | SSI_IM_RTIM);
 		dma.clear_interrupt(spec.tx_dma_channel | spec.rx_dma_channel);
 
 		task_woken = pdFALSE;
-		if (dma_status & spec.tx_dma_channel) {
+
+		if (msk_status & SSI_IM_RTIM) {
+			/* TODO: handle error */
 			xSemaphoreGiveFromISR(interrupt_semaphore, &task_woken);
-		} else {
-			int a;
-			a = 10;
+		} else if (msk_status & SSI_IM_RORIM) {
+			/* TODO: handle error */
+			xSemaphoreGiveFromISR(interrupt_semaphore, &task_woken);
+		} else if (dma_status & spec.rx_dma_channel) {
+			xSemaphoreGiveFromISR(interrupt_semaphore, &task_woken);
 		}
 
 		if (task_woken != pdFALSE) {
@@ -88,6 +91,53 @@ private:
 		IntDisable(spec.interrupt_number);
 	}
 
+	inline void configure_gpio(void) {
+		GPIOPinTypeSSI(spec.gpio_base, spec.gpio_pins);
+		GPIOPinTypeGPIOOutput(spec.gpio_base, spec.gpio_cs_pin);
+		GPIOPinWrite(spec.gpio_base, spec.gpio_cs_pin, spec.gpio_cs_pin);
+	}
+
+	inline void configure_mode(void) {
+		SSIConfigSetExpClk(Base, SysCtlClockGet(), SSI_FRF_MOTO_MODE_0, SSI_MODE_MASTER, 100000, 8);
+	}
+
+	inline void enable_end_of_transmission(void) const {
+		HWREG(Base + SSI_O_CR1) |= SSI_CR1_EOT;
+	}
+
+	inline void disable_end_of_transmission(void) const {
+		HWREG(Base + SSI_O_CR1) &= ~SSI_CR1_EOT;
+	}
+
+	inline void set_interrupt_mask(uint32_t mask) const {
+		HWREG(Base + SSI_O_IM) = mask;
+	}
+
+	inline void enable_dma(uint32_t dma_operations) const {
+		HWREG(Base + SSI_O_DMACTL) = dma_operations;
+	}
+
+	inline void reset_interrupt_semaphore(void) {
+		xQueueReset(interrupt_semaphore);
+	}
+
+	inline bool wait_interrupt_semaphore(void) {
+		return xSemaphoreTake(interrupt_semaphore, portMAX_DELAY) == pdTRUE;
+	}
+
+	inline void power_on(void) const {
+		SysCtlPeripheralEnable(spec.ssi_periph);
+		SysCtlPeripheralReset(spec.ssi_periph);
+
+		SysCtlPeripheralEnable(spec.gpio_periph);
+		SysCtlPeripheralReset(spec.gpio_periph);
+	}
+
+	inline void power_off(void) const {
+		SysCtlPeripheralDisable(spec.gpio_periph);
+		SysCtlPeripheralDisable(spec.ssi_periph);
+	}
+
 public:
 
 	static void dispatch_isr(void) {
@@ -104,26 +154,33 @@ public:
 		interrupt_semaphore = xSemaphoreCreateBinary();
 		dev_lock = xSemaphoreCreateMutex();
 
-		SysCtlPeripheralEnable(spec.ssi_periph);
-		SysCtlPeripheralEnable(spec.gpio_periph);
+		this->power_on();
+		this->disable();
+		this->configure_gpio();
+		this->configure_mode();
 
-		GPIOPinTypeSSI(spec.gpio_base, spec.gpio_pins);
-		GPIOPinTypeGPIOOutput(spec.gpio_base, spec.gpio_cs_pin);
-		GPIOPinWrite(spec.gpio_base, spec.gpio_cs_pin, spec.gpio_cs_pin);
+		this->enable_dma(SSI_DMA_TX | SSI_DMA_RX);
+		this->clear_interrupt(SSI_IM_RTIM | SSI_IM_RORIM);
+		this->set_interrupt_mask(SSI_IM_RTIM | SSI_IM_RORIM);
 
-		SSIConfigSetExpClk(Base, SysCtlClockGet(), SSI_FRF_MOTO_MODE_0, SSI_MODE_MASTER, 100000, 8);
-		HWREG(Base + SSI_O_DMACTL) = SSI_DMA_TX | SSI_DMA_RX;	/* Enable DMA operations on RX and TX */
-		clear_interrupt(SSI_IM_RORIM | SSI_IM_RTIM);
-		HWREG(Base + SSI_O_IM) = 0;								/* SSI_IM_TXIM | SSI_IM_RXIM | SSI_IM_RTIM | SSI_IM_RORIM */
-		HWREG(Base + SSI_O_CR1) = /*SSI_CR1_EOT |*/ SSI_CR1_SSE;	/* Master mode, End of Transmission interrupt mode SSI enabled; */
+		this->enable();
+	}
 
-		dma.set_attribute(spec.rx_dma_channel | spec.tx_dma_channel, UDMA_ATTRIBUTE_NONE);
+	inline void enable(void) const {
+		HWREG(Base + SSI_O_CR1) |= SSI_CR1_SSE;
+	}
+
+	inline void disable(void) const {
+		HWREG(Base + SSI_O_CR1) &= ~SSI_CR1_SSE;
+	}
+
+	inline bool is_enabled(void) const {
+		return HWREG(Base + SSI_O_CR1) & SSI_CR1_SSE;
 	}
 
 	virtual ~ssi_dev_t() {
 		ssi_dev_t::device = NULL;
-		SysCtlPeripheralDisable(spec.gpio_periph);
-		SysCtlPeripheralDisable(spec.ssi_periph);
+
 	}
 
 	void chip_select(void) {
@@ -139,25 +196,31 @@ public:
 		}
 	}
 
+	/*
+	 * NOTE: SSI module need to be disabled before configuring DMA channel.
+	 * Otherwise it module reads a junk byte at 0 index and does not read latest one?!
+	 */
 	bool transceive(void * in_data, uint32_t count, void * out_data) {
 		if (xSemaphoreTake(dev_lock, portMAX_DELAY) == pdTRUE) {
-			dma.set_channel_control(spec.tx_dma_channel_number, spec.tx_dma_channel_control,
-					in_data, (void *)(Base + SSI_O_DR), count);
+			this->disable();
+			this->clear_interrupt(SSI_IM_RTIM | SSI_IM_RORIM);
 
-			dma.set_channel_control(spec.rx_dma_channel_number, spec.rx_dma_channel_control,
-					(void *)(Base + SSI_O_DR), out_data, count);
-
-			clear_interrupt(SSI_IM_RORIM | SSI_IM_RTIM);
+			dma.disable_channel(spec.tx_dma_channel | spec.rx_dma_channel);
 			dma.clear_interrupt(spec.tx_dma_channel | spec.rx_dma_channel);
+			dma.set_attribute(spec.tx_dma_channel | spec.rx_dma_channel, UDMA_ATTRIBUTE_NONE);
+			dma.set_channel_control(spec.tx_dma_channel_number, spec.tx_dma_channel_control, in_data, (void *)(Base + SSI_O_DR), count);
+			dma.set_channel_control(spec.rx_dma_channel_number, spec.rx_dma_channel_control, (void *)(Base + SSI_O_DR), out_data, count);
 
-			xQueueReset(interrupt_semaphore);
+			this->reset_interrupt_semaphore();
+			this->enable();
 
-			enable_interrupt();
+			this->enable_interrupt();
 			dma.enable_channel(spec.tx_dma_channel | spec.rx_dma_channel);
+			bool result = this->wait_interrupt_semaphore();
+			dma.disable_channel(spec.tx_dma_channel | spec.rx_dma_channel);
+			this->disable_interrupt();
 
-			bool result = xSemaphoreTake(interrupt_semaphore, portMAX_DELAY) == pdTRUE;
-
-			disable_interrupt();
+			/* TODO: handle response */
 
 			xSemaphoreGive(dev_lock);
 			return result;

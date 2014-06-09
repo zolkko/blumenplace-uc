@@ -21,7 +21,7 @@
 
 
 #ifdef ccs
-#pragma DATA_ALIGN(UDMA_CTL_TBL, 1024)
+#pragma DATA_ALIGN(CTL_TBL, 1024)
 static uint8_t CTL_TBL[1024];
 #else
 static uint8_t CTL_TBL[1024] __attribute__ ((aligned(1024)));

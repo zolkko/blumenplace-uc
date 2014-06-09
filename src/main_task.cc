@@ -29,12 +29,14 @@
 #include "ssi_dev.h"
 
 
+uint8_t in_data[20] __attribute__ ((aligned(32)));
+uint8_t out_data[50] __attribute__ ((aligned(32)));
+
+
 void main_task(void * params)
 {
-	uint8_t out_data[20];
-	uint8_t in_data[20];
-
-	uint8_t i;
+	uint8_t i, j;
+	uint8_t input_data;
 
 	dma_dev_t& dma = dma_dev_t::get();
 	dma.initialize();
@@ -42,31 +44,30 @@ void main_task(void * params)
 	ssi_dev_t<SSI0_BASE> ssi0(dma);
 
 	ssi0.flush();
+
+	j = 0;
 	while (true) {
-		for (i = 0; i < sizeof(out_data); i++) {
-			in_data[i] = i;
-			out_data[i] = 0;
+		//ssi0.chip_select();
+		//input_data = ssi0.send(0xaa);
+		//ssi0.chip_release();
+		//printf("ssi0.send 170 = %d\n", input_data);
+
+		if (j > (255 - sizeof(in_data))) {
+			j = 0;
 		}
 
-		ssi0.chip_select();
-		uint32_t inp = ssi0.send(0xaa);
-		ssi0.chip_release();
-		printf("ssi0.send 170 = %d\n", inp);
-
-		ssi0.flush();
-
+		for (i = 0; i < sizeof(in_data); i++) in_data[i]  = j + i;
+		for (i = 0; i < sizeof(out_data); i++) out_data[i] = 0;
+		//for (i = 0; i < sizeof(out_data); i++) { printf("%d ", out_data[i]); } printf("\n");
 		ssi0.chip_select();
 		ssi0.transceive(in_data, sizeof(in_data), out_data);
-
-		for (i = 0; i < sizeof(in_data); i++) printf("%d ", in_data[i]);
-		printf("\n");
-
-		for (i = 0; i < sizeof(out_data); i++) printf("%d ", out_data[i]);
-		printf("\n");
-
 		ssi0.chip_release();
 
+		for (i = 0; i < sizeof(in_data); i++) { printf("%d ", in_data[i]); } printf("\n");
+		for (i = 0; i < sizeof(out_data); i++) { printf("%d ", out_data[i]); } printf("\n");
 		printf("------------------\n");
+
+		j += sizeof(in_data);
 		vTaskDelay(1000 / portTICK_PERIOD_MS);
 	}
 
