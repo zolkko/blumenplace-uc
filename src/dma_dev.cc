@@ -33,19 +33,36 @@ void udma_error_isr_handler(void);
 }
 
 
+dma_dev_t * dma_dev_t::device = NULL;
+
+
 void udma_error_isr_handler(void)
 {
-	dma_dev_t::get().handle_error_isr();
+	dma_dev_t::dispatch_dma_error_isr();
 }
 
 
-void dma_dev_t::initialize(void)
+dma_dev_t::dma_dev_t()
 {
 	portENTER_CRITICAL();
 
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_UDMA);
+	SysCtlPeripheralReset(SYSCTL_PERIPH_UDMA);
 	HWREG(UDMA_CFG) = UDMA_CFG_MASTEN;
 	HWREG(UDMA_CTLBASE) = (uint32_t)CTL_TBL;
+
+	dma_dev_t::device = this;
+
+	portEXIT_CRITICAL();
+}
+
+
+dma_dev_t::~dma_dev_t() {
+	portENTER_CRITICAL();
+
+	dma_dev_t::device = NULL;
+	HWREG(UDMA_CFG) = UDMA_CFG_MASTEN;
+	SysCtlPeripheralDisable(SYSCTL_PERIPH_UDMA);
 
 	portEXIT_CRITICAL();
 }

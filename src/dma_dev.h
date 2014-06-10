@@ -8,6 +8,18 @@
 #include <driverlib/udma.h>
 
 
+namespace dma {
+
+typedef enum {
+	NONE = 0,
+	ALTSELECT = (1),
+	USEBURST = (1 << 1),
+	HIGH_PRIORITY = (1 << 2),
+	REQMASK = (1 << 3),
+} attribute_t;
+
+};
+
 typedef struct {
 	volatile void * src_addr_end;
 	volatile void * dst_addr_end;
@@ -42,32 +54,24 @@ typedef enum {
 
 
 class dma_dev_t {
-private:
-	std::vector<dma_listener_t*> error_listeners;
-
-	dma_dev_t() { }
-
-	dma_dev_t(const dma_dev_t& dma_dev_) {}
-
-	void operator=(const dma_dev_t& dma_dev_) {}
-
 public:
-	static dma_dev_t& get(void) {
-		static dma_dev_t dma_dev;
-		return dma_dev;
-	}
 
-	void initialize(void);
+	dma_dev_t();
 
-	void deinitialize(void) {
-		HWREG(UDMA_CFG) = UDMA_CFG_MASTEN;
-		SysCtlPeripheralDisable(SYSCTL_PERIPH_UDMA);
-	}
+	virtual ~dma_dev_t(void);
 
 	void subscribe_error(dma_listener_t * listener) {
 		portENTER_CRITICAL();
 		error_listeners.push_back(listener);
 		portEXIT_CRITICAL();
+	}
+
+	uint32_t error_status(void) const {
+		return HWREG(UDMA_ERRCLR);
+	}
+
+	void clear_error_status(void) const {
+		HWREG(UDMA_ERRCLR) = 1;
 	}
 
 	bool unsubscribe_error(dma_listener_t * listener) {
@@ -82,13 +86,22 @@ public:
 		return false;
 	}
 
-	void handle_error_isr(void) {
-		uint32_t status = uDMAIntStatus();
-		uDMAIntClear(status);
+	static void dispatch_dma_error_isr(void) {
+		portENTER_CRITICAL();
+		dma_dev_t * dev = dma_dev_t::device;
+		if (dev) {
+			dev->handle_error_isr();
+		}
+		portEXIT_CRITICAL();
+	}
 
-		uint32_t error = uDMAErrorStatusGet();
+	void handle_error_isr(void) {
+		uint32_t status = this->get_interrupt_status();
+		this->clear_interrupt(status);
+
+		uint32_t error = this->error_status();
 		if (error) {
-			uDMAErrorStatusClear();
+			this->clear_error_status();
 		}
 
 		portENTER_CRITICAL();
@@ -170,6 +183,10 @@ public:
 	void disable_channel(uint32_t channel_mask) {
 		HWREG(UDMA_ENACLR) = channel_mask;
 	}
+
+private:
+	static dma_dev_t * device;
+	std::vector<dma_listener_t*> error_listeners;
 };
 
 #endif /* __dma_dev_h__ */

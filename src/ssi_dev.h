@@ -3,6 +3,11 @@
 #define __ssi_dev_h__
 
 
+#include <inc/tm4c123gh6pm.h>
+#include <inc/hw_memmap.h>
+#include <inc/hw_types.h>
+#include <inc/hw_udma.h>
+#include <inc/hw_ssi.h>
 #include "dma_dev.h"
 
 
@@ -37,14 +42,6 @@ public:
 template<uint32_t Base>
 class ssi_dev_t {
 private:
-	static const ssi_spec_t<Base> spec;
-
-	static ssi_dev_t* device;
-
-	dma_dev_t& dma;
-	SemaphoreHandle_t interrupt_semaphore;
-	SemaphoreHandle_t dev_lock;
-
 	void handle_isr(void) {
 		static BaseType_t task_woken;
 
@@ -289,8 +286,18 @@ public:
 	bool is_transmit_fifo_empty(void) const {
 		return get_status() & SSI_SR_TFE;
 	}
+
+private:
+	static const ssi_spec_t<Base> spec;
+	static ssi_dev_t* device;
+
+	dma_dev_t& dma;
+	SemaphoreHandle_t interrupt_semaphore;
+	SemaphoreHandle_t dev_lock;
 };
 
+
 template<uint32_t Base> ssi_dev_t<Base> * ssi_dev_t<Base>::device = NULL;
+
 
 #endif /* __ssi_dev_h__ */
