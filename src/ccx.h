@@ -80,6 +80,17 @@ extern "C" {
 #define CCx_TEST0							(0x2E)	/* Various test settings */
 
 /*
+ * Extended register space for CC120x
+ *
+ * In order to access these registers the MCU has to
+ * send [rw | 0 | 0x2f] [extender address] [data] sequence.
+ */
+#define CCx_EXTENDED_REGISTER				(0x2f)	/* Extended register address */
+
+#define CCx_PARTNUMBER						(0x8f)	/* Part number, Chip ID: 0x20 - cc1200, 0x21 - cc1201 */
+#define CCx_PARTVERSION						(0x90)	/* Part revision */
+
+/*
  * Strobe commands
  */
 #define CCx_SRES							(0x30)	/* Reset chip. */
@@ -346,9 +357,13 @@ private:
 	}
 
 private:
+	void start_transaction(void);
+	void finish_transaction(void);
+
 	uint8_t write(uint8_t addr, uint8_t data);
 	uint8_t read(uint8_t addr, uint8_t * data);
 	uint8_t burst_write(uint8_t addr, const uint8_t * data, uint8_t data_size);
+	uint8_t ext_reg_read(uint8_t ext_reg_addr);
 
 	void wait_ready(void);
 

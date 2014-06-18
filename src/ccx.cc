@@ -117,6 +117,34 @@ uint8_t ccx_t::read(uint8_t addr, uint8_t * data)
 }
 
 
+void ccx_t::start_transaction(void)
+{
+	ssi.chip_select();
+	wait_ready();
+}
+
+
+void ccx_t::finish_transaction(void)
+{
+	ssi.wait_ready();
+	ssi.chip_release();
+}
+
+
+uint8_t ccx_t::ext_reg_read(uint8_t ext_reg_addr)
+{
+	uint8_t result = 0;
+
+	start_transaction();
+	ssi.send(CCx_EXTENDED_REGISTER | CCx_RW_BIT_bm);
+	ssi.send(ext_reg_addr);
+	result = ssi.send(0x00);
+	finish_transaction();
+
+	return result;
+}
+
+
 uint8_t ccx_t::burst_write(uint8_t addr, const uint8_t * data, uint8_t data_size)
 {
 	uint8_t out[data_size];
@@ -129,40 +157,32 @@ uint8_t ccx_t::burst_write(uint8_t addr, const uint8_t * data, uint8_t data_size
 	}
 }
 
+/*
+ * Waits until SO pin goes low
+ */
 void ccx_t::wait_ready(void) {
-	while (!gdo1.is_set()) {
+	while (gdo1.is_set()) {
 	}
 }
 
-/*
- * TODO: module locking and unlocking
- */
+
+uint8_t ccx_t::part_number(void)
+{
+	return ext_reg_read(CCx_PARTNUMBER);
+}
+
+
 uint8_t ccx_t::version(void)
 {
 	ssi.chip_select();
 	//wait_ready();
 
 	uint8_t version = 0;
-	read(CCx_VERSION, &version);
+	read(CCx_PARTVERSION, &version);
 
 	ssi.chip_release();
 
 	return version;
-}
-
-
-uint8_t ccx_t::part_number(void)
-{
-	ssi.chip_select();
-	// wait_ready();
-
-	uint8_t part_num = 0;
-	read(CCx_PARTNUM, &part_num);
-
-	ssi.wait_ready();
-	ssi.chip_release();
-
-	return part_num;
 }
 
 

@@ -72,7 +72,7 @@ void main_task(void * params)
 			printf("failed to reset cc1201");
 		} else {
 			uint8_t part_num = ccx.part_number();
-			//printf("part number %d\n", part_num);
+			printf("part number %02x\n", part_num);
 		}
 
 //		ssi0.chip_select();
