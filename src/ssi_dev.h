@@ -14,6 +14,7 @@
 #include <inc/hw_ssi.h>
 #include "dma_dev.h"
 #include <driverlib/sysctl.h>
+#include <driverlib/interrupt.h>
 
 
 template<uint32_t Base>
