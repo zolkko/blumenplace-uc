@@ -2,10 +2,19 @@
 #ifndef __dma_dev_h__
 #define __dma_dev_h__
 
+#include <stdint.h>
+
 #include <vector>
 #include <algorithm>
+
+#include <inc/tm4c123gh6pm.h>
+#include <inc/hw_memmap.h>
+#include <inc/hw_types.h>
 #include <inc/hw_udma.h>
+
 #include <driverlib/udma.h>
+
+#include <FreeRTOS.h>
 
 
 namespace dma {

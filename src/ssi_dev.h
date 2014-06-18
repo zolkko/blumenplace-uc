@@ -3,12 +3,17 @@
 #define __ssi_dev_h__
 
 
+#include "FreeRTOSConfig.h"
+#include <FreeRTOS.h>
+#include <semphr.h>
+
 #include <inc/tm4c123gh6pm.h>
 #include <inc/hw_memmap.h>
 #include <inc/hw_types.h>
 #include <inc/hw_udma.h>
 #include <inc/hw_ssi.h>
 #include "dma_dev.h"
+#include <driverlib/sysctl.h>
 
 
 template<uint32_t Base>
@@ -39,8 +44,18 @@ public:
 };
 
 
+class ssi_t {
+public:
+	virtual void chip_select(void) = 0;
+	virtual void chip_release(void) = 0;
+	virtual uint32_t send(uint32_t data) = 0;
+	virtual bool transceive(void * in_data, uint32_t count, void * out_data) = 0;
+	virtual void wait_ready(void) = 0;
+};
+
+
 template<uint32_t Base>
-class ssi_dev_t {
+class ssi_dev_t : public ssi_t {
 private:
 	void handle_isr(void) {
 		static BaseType_t task_woken;
@@ -96,6 +111,7 @@ private:
 
 	inline void configure_mode(void) {
 		SSIConfigSetExpClk(Base, SysCtlClockGet(), SSI_FRF_MOTO_MODE_0, SSI_MODE_MASTER, 100000, 8);
+		HWREG(Base + SSI_O_CR1) &= ~SSI_CR1_LBM;
 	}
 
 	inline void enable_end_of_transmission(void) const {
@@ -146,12 +162,15 @@ public:
 	ssi_dev_t(dma_dev_t& dma_) : dma(dma_) {
 		disable_interrupt();
 
+		portENTER_CRITICAL();
 		ssi_dev_t::device = this;
+		portEXIT_CRITICAL();
 
 		interrupt_semaphore = xSemaphoreCreateBinary();
 		dev_lock = xSemaphoreCreateMutex();
 
 		this->power_on();
+
 		this->disable();
 		this->configure_gpio();
 		this->configure_mode();
@@ -159,7 +178,6 @@ public:
 		this->enable_dma(SSI_DMA_TX | SSI_DMA_RX);
 		this->clear_interrupt(SSI_IM_RTIM | SSI_IM_RORIM);
 		this->set_interrupt_mask(SSI_IM_RTIM | SSI_IM_RORIM);
-
 		this->enable();
 	}
 
@@ -180,11 +198,11 @@ public:
 
 	}
 
-	void chip_select(void) {
+	virtual void chip_select(void) {
 		GPIOPinWrite(spec.gpio_base, spec.gpio_cs_pin, 0x00);
 	}
 
-	void chip_release(void) {
+	virtual void chip_release(void) {
 		GPIOPinWrite(spec.gpio_base, spec.gpio_cs_pin, spec.gpio_cs_pin);
 	}
 
@@ -197,7 +215,7 @@ public:
 	 * NOTE: SSI module need to be disabled before configuring DMA channel.
 	 * Otherwise it module reads a junk byte at 0 index and does not read latest one?!
 	 */
-	bool transceive(void * in_data, uint32_t count, void * out_data) {
+	virtual bool transceive(void * in_data, uint32_t count, void * out_data) {
 		if (xSemaphoreTake(dev_lock, portMAX_DELAY) == pdTRUE) {
 			this->disable();
 			this->clear_interrupt(SSI_IM_RTIM | SSI_IM_RORIM);
@@ -226,12 +244,14 @@ public:
 		return false;
 	}
 
-	uint32_t send(uint32_t data) {
+	virtual uint32_t send(uint32_t data) {
 		while (!is_transmit_fifo_not_full()) {}
 		write(data);
 
 		while (!is_receive_fifo_not_empty()) {}
-		return read();
+		uint32_t result = read();
+
+		return result;
 	}
 
 	bool send_non_blocking(uint32_t data) {
@@ -255,35 +275,40 @@ public:
 		}
 	}
 
-	void write(uint32_t data) {
+	inline void write(uint32_t data) {
 		HWREG(Base + SSI_O_DR) = data;
 	}
 
-	uint32_t read(void) {
+	inline uint32_t read(void) {
 		return HWREG(Base + SSI_O_DR);
 	}
 
-	uint32_t get_status(void) const {
+	uint32_t get_status(void) {
 		return HWREG(Base + SSI_O_SR);
 	}
 
-	bool is_busy(void) const {
+	virtual void wait_ready(void) {
+		while (is_busy()) {
+		}
+	}
+
+	bool is_busy(void) {
 		return get_status() & SSI_SR_BSY;
 	}
 
-	bool is_receive_fifo_full(void) const {
+	bool is_receive_fifo_full(void) {
 		return get_status() & SSI_SR_RFF;
 	}
 
-	bool is_receive_fifo_not_empty(void) const {
+	bool is_receive_fifo_not_empty(void) {
 		return get_status() & SSI_SR_RNE;
 	}
 
-	bool is_transmit_fifo_not_full(void) const {
+	bool is_transmit_fifo_not_full(void) {
 		return get_status() & SSI_SR_TNF;
 	}
 
-	bool is_transmit_fifo_empty(void) const {
+	bool is_transmit_fifo_empty(void) {
 		return get_status() & SSI_SR_TFE;
 	}
 

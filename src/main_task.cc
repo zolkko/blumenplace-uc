@@ -17,6 +17,7 @@
 #include "ccx.hpp"
 
 #include "driverlib/interrupt.h"
+#include <memory>
 #include <vector>
 
 #include "driverlib/ssi.h"
@@ -28,6 +29,8 @@
 #include "gpio_port.h"
 #include "ssi_dev.h"
 
+#include "ccx.h"
+
 
 uint8_t in_data[20] __attribute__ ((aligned(32)));
 uint8_t out_data[50] __attribute__ ((aligned(32)));
@@ -35,19 +38,64 @@ uint8_t out_data[50] __attribute__ ((aligned(32)));
 
 void main_task(void * params)
 {
-	uint8_t i, j;
-	uint8_t input_data;
+	uint8_t i;
+	int32_t j;
+	uint32_t input_data;
+
+	gpio_port_t<GPIO_PORTA_BASE, SYSCTL_PERIPH_GPIOA> porta;
+	porta.enable();
+
+	gpio_port_t<GPIO_PORTE_BASE, SYSCTL_PERIPH_GPIOE> porte;
+	porte.enable();
+
+	std::auto_ptr<gpio_pin_t> gdo0_pin_ptr = std::auto_ptr<gpio_pin_t>(porta.get_pin(GPIO_PIN_7));
+	gdo0_pin_ptr->set_mode_input();
+
+	std::auto_ptr<gpio_pin_t> gdo2_pin_ptr = std::auto_ptr<gpio_pin_t>(porta.get_pin(GPIO_PIN_6));
+	gdo2_pin_ptr->set_mode_input();
+
+	std::auto_ptr<gpio_pin_t> gdo1_pin_ptr = std::auto_ptr<gpio_pin_t>(porte.get_pin(GPIO_PIN_5));
+	gdo1_pin_ptr->set_mode_input();
 
 	dma_dev_t dma;
 	ssi_dev_t<SSI0_BASE> ssi0(dma);
-
 	ssi0.flush();
 
+	ccx_t ccx(ssi0, *gdo0_pin_ptr, *gdo1_pin_ptr, *gdo2_pin_ptr);
+
 	j = 0;
+	ssi0.flush();
 	while (true) {
+		// uint8_t version = ccx.version();
+		// printf("version = %d\n", version);
+		if (!ccx.reset()) {
+			printf("failed to reset cc1201");
+		} else {
+			uint8_t part_num = ccx.part_number();
+			//printf("part number %d\n", part_num);
+		}
+
+//		ssi0.chip_select();
+//		ssi0.send(CCx_VERSION | CCx_RW_BIT_bm);
+//		uint32_t version = ssi0.send(0x00);
+//		ssi0.chip_release();
+//
+//		printf("version %d\n", version);
+
+//		SysCtlDelay(2000);
+
+		/*if (pin->is_set()) {
+			printf("GPIO_PIN_5 is set\n");
+		} else {
+			printf("GPIO_PIN_5 is NOT set\n");
+		}*/
+		/*ssi0.flush();
+
 		ssi0.chip_select();
 		input_data = ssi0.send(0xaa);
-		ssi0.chip_release();
+		ssi0.chip_release();*/
+
+		/*
 		printf("ssi0.send 170 = %d\n", input_data);
 
 		if (j > (255 - sizeof(in_data))) {
@@ -65,8 +113,8 @@ void main_task(void * params)
 		for (i = 0; i < sizeof(out_data); i++) { printf("%d ", out_data[i]); } printf("\n");
 		printf("------------------\n");
 
-		j += sizeof(in_data);
-		vTaskDelay(1000 / portTICK_PERIOD_MS);
+		j += sizeof(in_data);*/
+		// vTaskDelay(1000 / portTICK_PERIOD_MS);
 	}
 
 	/*
