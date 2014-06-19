@@ -59,7 +59,7 @@ extern uint32_t __bss_start__;
 extern uint32_t __bss_end__;
 
 /* address defined in LD script */
-extern uint32_t STACK_TOP_ADDR;
+extern uint32_t __StackTop;
 
 extern _mainCRTStartup(void);
 
@@ -80,8 +80,7 @@ extern _mainCRTStartup(void);
 __attribute__ ((section(".isr_vector")))
 void (* const g_pfnVectors[])(void) =
 {
-	(void (*)(void))(&STACK_TOP_ADDR),
-                                            // The initial stack pointer
+	(void (*)(void))(&__StackTop),			// The initial stack pointer
     reset_isr_handler,                      // The reset handler
     NmiSR,                                  // The NMI handler
     FaultISR,                               // The hard fault handler

@@ -1,10 +1,3 @@
-/******************************************************************************
- *
- * Default Linker script for the Texas Instruments TM4C123GE6PM
- *
- * This is derived from revision 12626 of the TivaWare Library.
- *
- *****************************************************************************/
 
 MEMORY
 {
@@ -12,20 +5,12 @@ MEMORY
 	SRAM (WX)  : ORIGIN = 0x20000000, LENGTH = 0x00008000
 }
 
-REGION_ALIAS("REGION_TEXT", FLASH);
-REGION_ALIAS("REGION_BSS", SRAM);
-REGION_ALIAS("REGION_DATA", SRAM);
-REGION_ALIAS("REGION_STACK", SRAM);
-REGION_ALIAS("REGION_HEAP", SRAM);
-REGION_ALIAS("REGION_ARM_EXIDX", FLASH);
-REGION_ALIAS("REGION_ARM_EXTAB", FLASH);
 
 SECTIONS {
-	/*PROVIDE (_intvecs_base_address = ORIGIN(FLASH));*/
-
 	.isr_vector ( ORIGIN(FLASH) ) : AT ( ORIGIN(FLASH) ) {
 		KEEP (*(.isr_vector))
 	} > FLASH
+
 
 	.isr_handlers : {
 		. = ALIGN(0x4);
@@ -33,80 +18,146 @@ SECTIONS {
 		*(.isr_handler.*)
 	} > FLASH
 
+
 	.text : {
 		CREATE_OBJECT_SYMBOLS
+
+		/* init and fini */
+		. = ALIGN(0x04);
+		KEEP(*(.init))
+		KEEP(*(.fini*))
+
+		/* .ctors */
+		. = ALIGN(0x04);
+		*crtbegin.o(.ctors)
+		*crtbegin?.o(.ctors)
+		*(EXCLUDE_FILE(*crtend?.o *crtend.o) .ctors)
+		*(SORT(.ctors.*))
+		*(.ctors)
+
+		/* .dtors */
+		. = ALIGN(0x04);
+		*crtbegin.o(.dtors)
+		*crtbegin?.o(.dtors)
+		*(EXCLUDE_FILE(*crtend?.o *crtend.o) .dtors)
+		*(SORT(.dtors.*))
+		*(.dtors)
+
+		/* code goes here */
+		. = ALIGN(0x04);
 		KEEP (*(.text))
 		*(.text.*)
-		. = ALIGN(0x4);
-		KEEP (*(.ctors))
-		. = ALIGN(0x4);
-		KEEP (*(.dtors))
-		. = ALIGN(0x4);
-		__init_array_start = .;
-		KEEP (*(.init_array*))
-		__init_array_end = .;
-		*(.init)
-		*(.fini*)
-	} > REGION_TEXT
 
-	PROVIDE (_vtable_base_address = 0x20000000);
+		/* preinit data */
+		. = ALIGN(0x04);
+		PROVIDE_HIDDEN (__preinit_array_start = .);
+		KEEP(*(.preinit_array))
+		PROVIDE_HIDDEN (__preinit_array_end = .);
+		
+		/* init data */
+		. = ALIGN(4);
+		PROVIDE_HIDDEN (__init_array_start = .);
+		KEEP(*(SORT(.init_array.*)))
+		KEEP(*(.init_array))
+		PROVIDE_HIDDEN (__init_array_end = .);
 
-	.vtable (_vtable_base_address) : AT (_vtable_base_address) {
-		KEEP (*(.vtable))
-	} > REGION_DATA
+		/* finit data */
+		. = ALIGN(4);
+		PROVIDE_HIDDEN (__fini_array_start = .);
+		KEEP(*(SORT(.fini_array.*)))
+		KEEP(*(.fini_array))
+		PROVIDE_HIDDEN (__fini_array_end = .);
+	} > FLASH
 
-	PROVIDE (__etext = .);
-	PROVIDE (_etext = .);
-	PROVIDE (etext = .);
 
 	.rodata : {
 		*(.rodata)
 		*(.rodata*)
-	} > REGION_TEXT
+	} > FLASH
 
-	.data : ALIGN (4) {
-		__data_load__ = LOADADDR (.data);
-		__data_start__ = .;
-		KEEP (*(.data))
-		KEEP (*(.data*))
-		. = ALIGN (4);
-		__data_end__ = .;
-	} > REGION_DATA AT> REGION_TEXT
 
-	.ARM.exidx : {
-		__exidx_start = .;
-		*(.ARM.exidx* .gnu.linkonce.armexidx.*)
-		__exidx_end = .;
-	} > REGION_ARM_EXIDX
+	.eh_frames : {
+		KEEP(*(.eh_frame*))
+	} > FLASH
+
+
+	.ARM.extab : {
+		*(.ARM.extab* .gnu.linkonce.armextab.*)
+	} > FLASH
+
 
 	.ARM.extab : {
 		*(.ARM.extab* .gnu.linkonce.armextab.*)
 	} > REGION_ARM_EXTAB
 
+
+	__exidx_start = .;
+	.ARM.exidx : {
+		*(.ARM.exidx* .gnu.linkonce.armexidx.*)
+	} > FLASH
+	__exidx_end = .;
+
+
+	__etext = .;
+	_etext = .;
+	etext = .;
+
+	.data : AT (__etext) {
+		__data_load__ = LOADADDR(.data);
+		__data_start__ = .;
+		KEEP (*(.vtable))
+		*(vtable)
+		KEEP (*(.data))
+		KEEP (*(.data*))
+		KEEP (*(.jcr*))
+
+		/* all data end */
+		. = ALIGN(4);
+		__data_end__ = .;
+	} > SRAM AT> FLASH
+
+
 	.bss : {
+		. = ALIGN(4);
 		__bss_start__ = .;
 		*(.shbss)
 		KEEP (*(.bss))
-		*(.bss.*)
+		*(.bss*)
 		*(COMMON)
-		. = ALIGN (4);
+		. = ALIGN(4);
 		__bss_end__ = .;
-	} > REGION_BSS
+	} > SRAM
 
-	.heap : {
+
+	.heap (COPY): {
 		__heap_start__ = .;
-		end = __heap_start__;
-		_end = end;
-		__end = end;
-		KEEP(*(.heap))
-		__heap_end__ = .;
-		__HeapLimit = __heap_end__;
-	} > REGION_HEAP
+		end = .;
+		_end = .;
+		__end = .;
+		__end__ = .;
+		PROVIDE (end = .);
+		KEEP (*(.heap*))
+		__HeapLimit = .;
+	} > SRAM
+
+
+    .stack_dummy (COPY): {
+		*(.stack*)
+	} > SRAM
+
 
 	/* stack points to the highest address in SRAM */
-	PROVIDE(STACK_TOP_ADDR = ALIGN(ORIGIN(SRAM) + LENGTH(SRAM), 0x08));
-	.stack (STACK_TOP_ADDR)  : AT (STACK_TOP_ADDR) {
+	PROVIDE(__StackTop  = ALIGN(ORIGIN(SRAM) + LENGTH(SRAM), 0x04));
+	.stack (__StackTop)  : AT (__StackTop) {
 		_stack  = .;
 		__stack = .;
 	} > SRAM
+
+
+	PROVIDE (__StackLimit = __StackTop - SIZEOF(.stack_dummy))
+
+
+	/* Check if data + heap + stack exceeds RAM limit */
+	ASSERT(__StackLimit >= __HeapLimit, "region RAM overflowed with stack")
 }
+
