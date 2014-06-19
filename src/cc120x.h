@@ -231,47 +231,62 @@ extern "C" {
  *
  * @{
  */
-#define CCx_CHIP_CC1200						(0x20)
-#define CCx_CHIP_CC1201						(0x21)
+#define CCx_CHIP_CC1200				(0x20)
+#define CCx_CHIP_CC1201				(0x21)
+/* @} */
+
+/*
+ * @defgroup EXT_CTRL External control
+ * @{
+ */
+#define CCx_PIN_CTRL_EN_bm          (1 << 2)    /* Pin control reuses the SPI interface pins to execute SRX, STX, SPWD, and IDLE strobes */
+#define CCx_EXT_40K_CLOCK_EN        (1 << 1)    /* External 40k clock enabled. */
+#define CCx_BURST_ADDR_INCR_EN      (1)         /* Burst address increment enabled */
 /* @} */
 
 /*
  * @defgroup STROBES Strobe commands
  *
+ * Command strobes may be viewed as single byte instructions.
+ * When sending command strobe the R/W bit can be either one or zero.
+ *
  * @{
  */
-#define CCx_SRES							(0x30)	/* Reset chip. */
+/* reset chip */
+#define CCx_SRES					(0x30)
 /*
  * Enable and calibrate frequency synthesizer (if MCSM0.FS_AUTOCAL=1).
  * If in RX/TX: Go to a wait state where only the synthesizer is
  * running (for quick RX / TX turn around).
  */
-#define CCx_SFSTXON							(0x31)
-#define CCx_SXOFF							(0x32)	/* Turn off crystal oscillator. */
-#define CCx_SCAL							(0x33)	/* Calibrate frequency synthesizer and turn it off (enables quick start). */
+#define CCx_SFSTXON					(0x31)
+/* Turn off crystal oscillator. */
+#define CCx_SXOFF					(0x32)
+/* Calibrate frequency synthesizer and turn it off (enables quick start). */
+#define CCx_SCAL					(0x33)
 /*
  * Enable RX. Perform calibration first if coming from IDLE and
  * MCSM0.FS_AUTOCAL=1.
  */
-#define CCx_SRX								(0x34)
+#define CCx_SRX						(0x34)
 /*
  * In IDLE state: Enable TX. Perform calibration first if
  * MCSM0.FS_AUTOCAL=1. If in RX state and CCA is enabled:
  */
-#define CCx_STX								(0x35)
+#define CCx_STX						(0x35)
 /*
  * Exit RX / TX, turn off frequency synthesizer and exit
  * Wake-On-Radio mode if applicable.
  */
-#define CCx_SIDLE							(0x36)
-#define CCx_SAFC							(0x37)	/* Perform AFC adjustment of the frequency synthesizer */
-#define CCx_SWOR							(0x38)	/* Start automatic RX polling sequence (Wake-on-Radio) */
-#define CCx_SPWD							(0x39)	/* Enter power down mode when CSn goes high. */
-#define CCx_SFRX							(0x3A)	/* Flush the RX FIFO buffer. */
-#define CCx_SFTX							(0x3B)	/* Flush the TX FIFO buffer. */
-#define CCx_SWORRST							(0x3C)	/* Reset real time clock. */
+#define CCx_SIDLE					(0x36)
+#define CCx_SAFC					(0x37)	/* Perform AFC adjustment of the frequency synthesizer */
+#define CCx_SWOR					(0x38)	/* Start automatic RX polling sequence (Wake-on-Radio) */
+#define CCx_SPWD					(0x39)	/* Enter power down mode when CSn goes high. */
+#define CCx_SFRX					(0x3A)	/* Flush the RX FIFO buffer. */
+#define CCx_SFTX					(0x3B)	/* Flush the TX FIFO buffer. */
+#define CCx_SWORRST					(0x3C)	/* Reset real time clock. */
 /* No operation. May be used to pad strobe commands to two bytes for simpler software. */
-#define CCx_SNOP							(0x3D)
+#define CCx_SNOP					(0x3D)
 /* @} */
 
 
