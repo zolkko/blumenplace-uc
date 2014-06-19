@@ -21,18 +21,17 @@ REGION_ALIAS("REGION_ARM_EXIDX", FLASH);
 REGION_ALIAS("REGION_ARM_EXTAB", FLASH);
 
 SECTIONS {
-	PROVIDE (_intvecs_base_address = 0x0);
+	/*PROVIDE (_intvecs_base_address = ORIGIN(FLASH));*/
 
-	.intvecs (_intvecs_base_address) : AT (_intvecs_base_address) {
+	.isr_vector ( ORIGIN(FLASH) ) : AT ( ORIGIN(FLASH) ) {
 		KEEP (*(.isr_vector))
-		/* KEEP (*(.intvecs)) */
-	} > REGION_TEXT
+	} > FLASH
 
-	PROVIDE (_vtable_base_address = 0x20000000);
-
-	.vtable (_vtable_base_address) : AT (_vtable_base_address) {
-		KEEP (*(.vtable))
-	} > REGION_DATA
+	.isr_handlers : {
+		. = ALIGN(0x4);
+		KEEP (*(.isr_handler))
+		*(.isr_handler.*)
+	} > FLASH
 
 	.text : {
 		CREATE_OBJECT_SYMBOLS
@@ -49,6 +48,12 @@ SECTIONS {
 		*(.init)
 		*(.fini*)
 	} > REGION_TEXT
+
+	PROVIDE (_vtable_base_address = 0x20000000);
+
+	.vtable (_vtable_base_address) : AT (_vtable_base_address) {
+		KEEP (*(.vtable))
+	} > REGION_DATA
 
 	PROVIDE (__etext = .);
 	PROVIDE (_etext = .);
@@ -98,9 +103,10 @@ SECTIONS {
 		__HeapLimit = __heap_end__;
 	} > REGION_HEAP
 
-	.stack : ALIGN(0x8) {
-		_stack = .;
+	/* stack points to the highest address in SRAM */
+	PROVIDE(STACK_TOP_ADDR = ALIGN(ORIGIN(SRAM) + LENGTH(SRAM), 0x08));
+	.stack (STACK_TOP_ADDR)  : AT (STACK_TOP_ADDR) {
+		_stack  = .;
 		__stack = .;
-		KEEP(*(.stack))
-	} > REGION_STACK
+	} > SRAM
 }

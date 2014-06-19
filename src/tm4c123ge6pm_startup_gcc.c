@@ -24,12 +24,11 @@
 
 #include <stdint.h>
 
-//*****************************************************************************
-//
-// Forward declaration of the default fault handlers.
-//
-//*****************************************************************************
-void ResetISR(void);
+/*
+ * Forward declaration of the default fault handlers.
+ */
+void reset_isr_handler(void);
+
 static void NmiSR(void);
 static void FaultISR(void);
 static void IntDefaultHandler(void);
@@ -45,12 +44,24 @@ static void IntDefaultHandler(void);
 //*****************************************************************************
 extern int main(void);
 
+
 //*****************************************************************************
 //
-// Reserve space for the system stack.
+// The following are constructs created by the linker, indicating where the
+// the "data" and "bss" segments reside in memory.  The initializers for the
+// for the "data" segment resides immediately following the "text" segment.
 //
 //*****************************************************************************
-static uint32_t pui32Stack[128];
+extern uint32_t __etext;
+extern uint32_t __data_start__;
+extern uint32_t __data_end__;
+extern uint32_t __bss_start__;
+extern uint32_t __bss_end__;
+
+/* address defined in LD script */
+extern uint32_t STACK_TOP_ADDR;
+
+extern _mainCRTStartup(void);
 
 //*****************************************************************************
 //
@@ -69,9 +80,9 @@ static uint32_t pui32Stack[128];
 __attribute__ ((section(".isr_vector")))
 void (* const g_pfnVectors[])(void) =
 {
-    (void (*)(void))((uint32_t)pui32Stack + sizeof(pui32Stack)),
+	(void (*)(void))(&STACK_TOP_ADDR),
                                             // The initial stack pointer
-    ResetISR,                               // The reset handler
+    reset_isr_handler,                      // The reset handler
     NmiSR,                                  // The NMI handler
     FaultISR,                               // The hard fault handler
     IntDefaultHandler,                      // The MPU fault handler
@@ -227,122 +238,56 @@ void (* const g_pfnVectors[])(void) =
     IntDefaultHandler                       // PWM 1 Fault
 };
 
-//*****************************************************************************
-//
-// The following are constructs created by the linker, indicating where the
-// the "data" and "bss" segments reside in memory.  The initializers for the
-// for the "data" segment resides immediately following the "text" segment.
-//
-//*****************************************************************************
-extern uint32_t __etext;
-extern uint32_t __data_start__;
-extern uint32_t __data_end__;
-extern uint32_t __bss_start__;
-extern uint32_t __bss_end__;
 
-
-extern _mainCRTStartup(void);
-
-//*****************************************************************************
-//
-// This is the code that gets called when the processor first starts execution
-// following a reset event.  Only the absolutely necessary set is performed,
-// after which the application supplied entry() routine is called.  Any fancy
-// actions (such as making decisions based on the reset cause register, and
-// resetting the bits in that register) are left solely in the hands of the
-// application.
-//
-//*****************************************************************************
-void
-ResetISR(void)
+__attribute__ ((section(".isr_handler")))
+void reset_isr_handler(void)
 {
-	uint32_t *pui32Src, *pui32Dest;
-
-	//
-	// Copy the data segment initializers from flash to SRAM.
-	*pui32Src = &__etext;
-
-	for (pui32Dest = &__data_start__; pui32Dest < &__data_end__; ) {
+	/* Copy the data segment initializers from flash to SRAM. */
+	uint32_t * pui32Src = &__etext;
+	uint32_t * pui32Dest = &__data_start__;
+	for ( ; pui32Dest < &__data_end__; ) {
 		*pui32Dest++ = *pui32Src++;
 	}
 
-	// Zero fill the bss segment.
+	/* Zero fill the bss segment. */
 	__asm("    ldr     r0, =__bss_start__\n"
-		"    ldr     r1, =__bss_end__\n"
-		"    mov     r2, #0\n"
-		"    .thumb_func\n"
-		"zero_loop:\n"
-		"        cmp     r0, r1\n"
-		"        it      lt\n"
-		"        strlt   r2, [r0], #4\n"
-		"        blt     zero_loop");
+		  "    ldr     r1, =__bss_end__\n"
+		  "    mov     r2, #0\n"
+		  "    .thumb_func\n"
+		  "zero_loop:\n"
+		  "    cmp     r0, r1\n"
+		  "    it      lt\n"
+		  "    strlt   r2, [r0], #4\n"
+		  "    blt     zero_loop");
 
-	// Enable the floating-point unit.  This must be done here to handle the
-	// case where main() uses floating-point and the function prologue saves
-	// floating-point registers (which will fault if floating-point is not
-	// enabled).  Any configuration of the floating-point unit using DriverLib
-	// APIs must be done here prior to the floating-point unit being enabled.
-
-	// Note that this does not use DriverLib since it might not be included in
-	// this project.
+	/* Enable the floating-point unit. */
 	HWREG(0xE000ED88) = ((HWREG(0xE000ED88) & ~0x00F00000) | 0x00F00000);
 
+	// TODO: call sys_init
 	_mainCRTStartup();
-
-	// Call the application's entry point.
-	main();
 }
 
-//*****************************************************************************
-//
-// This is the code that gets called when the processor receives a NMI.  This
-// simply enters an infinite loop, preserving the system state for examination
-// by a debugger.
-//
-//*****************************************************************************
-static void
-NmiSR(void)
+
+__attribute__ ((section(".isr_handler")))
+static void NmiSR(void)
 {
-    //
-    // Enter an infinite loop.
-    //
-    while(1)
-    {
-    }
+	while (1) {
+	}
 }
 
-//*****************************************************************************
-//
-// This is the code that gets called when the processor receives a fault
-// interrupt.  This simply enters an infinite loop, preserving the system state
-// for examination by a debugger.
-//
-//*****************************************************************************
-static void
-FaultISR(void)
+
+__attribute__ ((section(".isr_handler")))
+static void FaultISR(void)
 {
-    //
-    // Enter an infinite loop.
-    //
-    while(1)
-    {
-    }
+	while (1) {
+	}
 }
 
-//*****************************************************************************
-//
-// This is the code that gets called when the processor receives an unexpected
-// interrupt.  This simply enters an infinite loop, preserving the system state
-// for examination by a debugger.
-//
-//*****************************************************************************
+
+__attribute__ ((section(".isr_handler")))
 static void
 IntDefaultHandler(void)
 {
-    //
-    // Go into an infinite loop.
-    //
-    while(1)
-    {
-    }
+	while (1) {
+	}
 }

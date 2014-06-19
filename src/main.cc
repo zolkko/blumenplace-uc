@@ -9,7 +9,7 @@
 #include "sys.h"
 #include "main_task.h"
 
-const uint32_t constant = 0xa1a1a1a1;
+const uint32_t constant = 123;
 
 class demo_t {
 public:
@@ -20,12 +20,9 @@ public:
 		d += demo_t::inc_def;
 	}
 private:
-	static uint32_t inc_def;
+	static const uint32_t inc_def = 1;
 	uint32_t d;
 };
-
-uint32_t demo_t::inc_def = 123;
-
 
 int main(void)
 {
