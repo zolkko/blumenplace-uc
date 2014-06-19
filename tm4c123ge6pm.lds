@@ -88,7 +88,7 @@ SECTIONS {
 
 	.ARM.extab : {
 		*(.ARM.extab* .gnu.linkonce.armextab.*)
-	} > REGION_ARM_EXTAB
+	} > FLASH
 
 
 	__exidx_start = .;
@@ -98,13 +98,17 @@ SECTIONS {
 	__exidx_end = .;
 
 
+	. = ALIGN (0x04);
 	__etext = .;
 	_etext = .;
 	etext = .;
 
+
 	.data : AT (__etext) {
 		__data_load__ = LOADADDR(.data);
+
 		__data_start__ = .;
+
 		KEEP (*(.vtable))
 		*(vtable)
 		KEEP (*(.data))
@@ -114,7 +118,7 @@ SECTIONS {
 		/* all data end */
 		. = ALIGN(4);
 		__data_end__ = .;
-	} > SRAM AT> FLASH
+	} > SRAM
 
 
 	.bss : {
@@ -141,7 +145,7 @@ SECTIONS {
 	} > SRAM
 
 
-    .stack_dummy (COPY): {
+	.stack_dummy (COPY): {
 		*(.stack*)
 	} > SRAM
 
@@ -154,10 +158,5 @@ SECTIONS {
 	} > SRAM
 
 
-	PROVIDE (__StackLimit = __StackTop - SIZEOF(.stack_dummy))
-
-
-	/* Check if data + heap + stack exceeds RAM limit */
-	ASSERT(__StackLimit >= __HeapLimit, "region RAM overflowed with stack")
+	PROVIDE (__StackLimit = __StackTop - SIZEOF(.stack_dummy));
 }
-
