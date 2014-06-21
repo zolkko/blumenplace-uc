@@ -37,7 +37,8 @@ void main_task(void * params)
 	gpio_port_t<GPIO_PORTE_BASE, SYSCTL_PERIPH_GPIOE> porte;
 	porte.enable();
 
-	std::auto_ptr<gpio_pin_t> gdo0_pin_ptr = std::auto_ptr<gpio_pin_t>(porta.get_pin(GPIO_PIN_7));
+	auto pin7 = porta.get_pin(GPIO_PIN_7);
+	std::auto_ptr<gpio_pin_t> gdo0_pin_ptr = std::auto_ptr<gpio_pin_t>(pin7);
 	gdo0_pin_ptr->set_mode_input();
 
 	std::auto_ptr<gpio_pin_t> gdo2_pin_ptr = std::auto_ptr<gpio_pin_t>(porta.get_pin(GPIO_PIN_6));

@@ -23,35 +23,13 @@
 //*****************************************************************************
 
 #include <stdint.h>
-
-/*
- * Forward declaration of the default fault handlers.
- */
-void reset_isr_handler(void);
-
-static void NmiSR(void);
-static void FaultISR(void);
-static void IntDefaultHandler(void);
+#include "sys.h"
 
 #ifndef HWREG
 #define HWREG(x) (*((volatile uint32_t *)(x)))
 #endif
 
-//*****************************************************************************
-//
-// The entry point for the application.
-//
-//*****************************************************************************
-extern int main(void);
 
-
-//*****************************************************************************
-//
-// The following are constructs created by the linker, indicating where the
-// the "data" and "bss" segments reside in memory.  The initializers for the
-// for the "data" segment resides immediately following the "text" segment.
-//
-//*****************************************************************************
 extern uint32_t __etext;
 extern uint32_t __data_start__;
 extern uint32_t __data_end__;
@@ -61,180 +39,177 @@ extern uint32_t __bss_end__;
 /* address defined in LD script */
 extern uint32_t __StackTop;
 
-extern _mainCRTStartup(void);
+/* Forward declaration of the default fault handlers. */
+static void reset_isr_handler(void);
+static void default_isr_handler(void);
+static void nmi_isr_handler(void);
+static void fault_isr_handler(void);
 
-//*****************************************************************************
-//
-// External declarations for the interrupt handlers used by the application.
-//
-//*****************************************************************************
-// To be added by user
+void __attribute__((weak)) systick_isr_handler(void);
+void __attribute__((weak, naked)) svc_isr_handler(void);
+void __attribute__((weak, naked)) pendsv_isr_handler(void);
 
-//*****************************************************************************
-//
-// The vector table.  Note that the proper constructs must be placed on this to
-// ensure that it ends up at physical address 0x0000.0000 or at the start of
-// the program if located at a start address other than 0.
-//
-//*****************************************************************************
+extern void _mainCRTStartup(void);
+
+
+/* The vector table. */
 __attribute__ ((section(".isr_vector")))
-void (* const g_pfnVectors[])(void) =
-{
-	(void (*)(void))(&__StackTop),			// The initial stack pointer
-    reset_isr_handler,                      // The reset handler
-    NmiSR,                                  // The NMI handler
-    FaultISR,                               // The hard fault handler
-    IntDefaultHandler,                      // The MPU fault handler
-    IntDefaultHandler,                      // The bus fault handler
-    IntDefaultHandler,                      // The usage fault handler
-    0,                                      // Reserved
-    0,                                      // Reserved
-    0,                                      // Reserved
-    0,                                      // Reserved
-    IntDefaultHandler,                      // SVCall handler
-    IntDefaultHandler,                      // Debug monitor handler
-    0,                                      // Reserved
-    IntDefaultHandler,                      // The PendSV handler
-    IntDefaultHandler,                      // The SysTick handler
-    IntDefaultHandler,                      // GPIO Port A
-    IntDefaultHandler,                      // GPIO Port B
-    IntDefaultHandler,                      // GPIO Port C
-    IntDefaultHandler,                      // GPIO Port D
-    IntDefaultHandler,                      // GPIO Port E
-    IntDefaultHandler,                      // UART0 Rx and Tx
-    IntDefaultHandler,                      // UART1 Rx and Tx
-    IntDefaultHandler,                      // SSI0 Rx and Tx
-    IntDefaultHandler,                      // I2C0 Master and Slave
-    IntDefaultHandler,                      // PWM Fault
-    IntDefaultHandler,                      // PWM Generator 0
-    IntDefaultHandler,                      // PWM Generator 1
-    IntDefaultHandler,                      // PWM Generator 2
-    IntDefaultHandler,                      // Quadrature Encoder 0
-    IntDefaultHandler,                      // ADC Sequence 0
-    IntDefaultHandler,                      // ADC Sequence 1
-    IntDefaultHandler,                      // ADC Sequence 2
-    IntDefaultHandler,                      // ADC Sequence 3
-    IntDefaultHandler,                      // Watchdog timer
-    IntDefaultHandler,                      // Timer 0 subtimer A
-    IntDefaultHandler,                      // Timer 0 subtimer B
-    IntDefaultHandler,                      // Timer 1 subtimer A
-    IntDefaultHandler,                      // Timer 1 subtimer B
-    IntDefaultHandler,                      // Timer 2 subtimer A
-    IntDefaultHandler,                      // Timer 2 subtimer B
-    IntDefaultHandler,                      // Analog Comparator 0
-    IntDefaultHandler,                      // Analog Comparator 1
-    IntDefaultHandler,                      // Analog Comparator 2
-    IntDefaultHandler,                      // System Control (PLL, OSC, BO)
-    IntDefaultHandler,                      // FLASH Control
-    IntDefaultHandler,                      // GPIO Port F
-    IntDefaultHandler,                      // GPIO Port G
-    IntDefaultHandler,                      // GPIO Port H
-    IntDefaultHandler,                      // UART2 Rx and Tx
-    IntDefaultHandler,                      // SSI1 Rx and Tx
-    IntDefaultHandler,                      // Timer 3 subtimer A
-    IntDefaultHandler,                      // Timer 3 subtimer B
-    IntDefaultHandler,                      // I2C1 Master and Slave
-    IntDefaultHandler,                      // Quadrature Encoder 1
-    IntDefaultHandler,                      // CAN0
-    IntDefaultHandler,                      // CAN1
-    0,                                      // Reserved
-    0,                                      // Reserved
-    IntDefaultHandler,                      // Hibernate
-    IntDefaultHandler,                      // USB0
-    IntDefaultHandler,                      // PWM Generator 3
-    IntDefaultHandler,                      // uDMA Software Transfer
-    IntDefaultHandler,                      // uDMA Error
-    IntDefaultHandler,                      // ADC1 Sequence 0
-    IntDefaultHandler,                      // ADC1 Sequence 1
-    IntDefaultHandler,                      // ADC1 Sequence 2
-    IntDefaultHandler,                      // ADC1 Sequence 3
-    0,                                      // Reserved
-    0,                                      // Reserved
-    IntDefaultHandler,                      // GPIO Port J
-    IntDefaultHandler,                      // GPIO Port K
-    IntDefaultHandler,                      // GPIO Port L
-    IntDefaultHandler,                      // SSI2 Rx and Tx
-    IntDefaultHandler,                      // SSI3 Rx and Tx
-    IntDefaultHandler,                      // UART3 Rx and Tx
-    IntDefaultHandler,                      // UART4 Rx and Tx
-    IntDefaultHandler,                      // UART5 Rx and Tx
-    IntDefaultHandler,                      // UART6 Rx and Tx
-    IntDefaultHandler,                      // UART7 Rx and Tx
-    0,                                      // Reserved
-    0,                                      // Reserved
-    0,                                      // Reserved
-    0,                                      // Reserved
-    IntDefaultHandler,                      // I2C2 Master and Slave
-    IntDefaultHandler,                      // I2C3 Master and Slave
-    IntDefaultHandler,                      // Timer 4 subtimer A
-    IntDefaultHandler,                      // Timer 4 subtimer B
-    0,                                      // Reserved
-    0,                                      // Reserved
-    0,                                      // Reserved
-    0,                                      // Reserved
-    0,                                      // Reserved
-    0,                                      // Reserved
-    0,                                      // Reserved
-    0,                                      // Reserved
-    0,                                      // Reserved
-    0,                                      // Reserved
-    0,                                      // Reserved
-    0,                                      // Reserved
-    0,                                      // Reserved
-    0,                                      // Reserved
-    0,                                      // Reserved
-    0,                                      // Reserved
-    0,                                      // Reserved
-    0,                                      // Reserved
-    0,                                      // Reserved
-    0,                                      // Reserved
-    IntDefaultHandler,                      // Timer 5 subtimer A
-    IntDefaultHandler,                      // Timer 5 subtimer B
-    IntDefaultHandler,                      // Wide Timer 0 subtimer A
-    IntDefaultHandler,                      // Wide Timer 0 subtimer B
-    IntDefaultHandler,                      // Wide Timer 1 subtimer A
-    IntDefaultHandler,                      // Wide Timer 1 subtimer B
-    IntDefaultHandler,                      // Wide Timer 2 subtimer A
-    IntDefaultHandler,                      // Wide Timer 2 subtimer B
-    IntDefaultHandler,                      // Wide Timer 3 subtimer A
-    IntDefaultHandler,                      // Wide Timer 3 subtimer B
-    IntDefaultHandler,                      // Wide Timer 4 subtimer A
-    IntDefaultHandler,                      // Wide Timer 4 subtimer B
-    IntDefaultHandler,                      // Wide Timer 5 subtimer A
-    IntDefaultHandler,                      // Wide Timer 5 subtimer B
-    IntDefaultHandler,                      // FPU
-    0,                                      // Reserved
-    0,                                      // Reserved
-    IntDefaultHandler,                      // I2C4 Master and Slave
-    IntDefaultHandler,                      // I2C5 Master and Slave
-    IntDefaultHandler,                      // GPIO Port M
-    IntDefaultHandler,                      // GPIO Port N
-    IntDefaultHandler,                      // Quadrature Encoder 2
-    0,                                      // Reserved
-    0,                                      // Reserved
-    IntDefaultHandler,                      // GPIO Port P (Summary or P0)
-    IntDefaultHandler,                      // GPIO Port P1
-    IntDefaultHandler,                      // GPIO Port P2
-    IntDefaultHandler,                      // GPIO Port P3
-    IntDefaultHandler,                      // GPIO Port P4
-    IntDefaultHandler,                      // GPIO Port P5
-    IntDefaultHandler,                      // GPIO Port P6
-    IntDefaultHandler,                      // GPIO Port P7
-    IntDefaultHandler,                      // GPIO Port Q (Summary or Q0)
-    IntDefaultHandler,                      // GPIO Port Q1
-    IntDefaultHandler,                      // GPIO Port Q2
-    IntDefaultHandler,                      // GPIO Port Q3
-    IntDefaultHandler,                      // GPIO Port Q4
-    IntDefaultHandler,                      // GPIO Port Q5
-    IntDefaultHandler,                      // GPIO Port Q6
-    IntDefaultHandler,                      // GPIO Port Q7
-    IntDefaultHandler,                      // GPIO Port R
-    IntDefaultHandler,                      // GPIO Port S
-    IntDefaultHandler,                      // PWM 1 Generator 0
-    IntDefaultHandler,                      // PWM 1 Generator 1
-    IntDefaultHandler,                      // PWM 1 Generator 2
-    IntDefaultHandler,                      // PWM 1 Generator 3
-    IntDefaultHandler                       // PWM 1 Fault
+void (* const g_pfnVectors[])(void) = {
+	(void (*)(void))(&__StackTop),	// The initial stack pointer
+	reset_isr_handler,				// The reset handler
+	nmi_isr_handler,				// The NMI handler
+	fault_isr_handler,				// The hard fault handler
+	default_isr_handler,			// The MPU fault handler
+	default_isr_handler,			// The bus fault handler
+	default_isr_handler,			// The usage fault handler
+	0,								// Reserved
+	0,								// Reserved
+	0,								// Reserved
+	0,								// Reserved
+	svc_isr_handler,				// SVCall handler
+	default_isr_handler,			// Debug monitor handler
+	0,								// Reserved
+	pendsv_isr_handler,				// The PendSV handler
+	systick_isr_handler,			// The SysTick handler
+	default_isr_handler,			// GPIO Port A
+	default_isr_handler,			// GPIO Port B
+	default_isr_handler,			// GPIO Port C
+	default_isr_handler,			// GPIO Port D
+	default_isr_handler,			// GPIO Port E
+	default_isr_handler,			// UART0 Rx and Tx
+	default_isr_handler,			// UART1 Rx and Tx
+	default_isr_handler,			// SSI0 Rx and Tx
+	default_isr_handler,			// I2C0 Master and Slave
+	default_isr_handler,			// PWM Fault
+	default_isr_handler,			// PWM Generator 0
+	default_isr_handler,			// PWM Generator 1
+	default_isr_handler,			// PWM Generator 2
+	default_isr_handler,			// Quadrature Encoder 0
+	default_isr_handler,			// ADC Sequence 0
+	default_isr_handler,			// ADC Sequence 1
+	default_isr_handler,			// ADC Sequence 2
+	default_isr_handler,			// ADC Sequence 3
+	default_isr_handler,			// Watchdog timer
+	default_isr_handler,			// Timer 0 subtimer A
+	default_isr_handler,			// Timer 0 subtimer B
+	default_isr_handler,			// Timer 1 subtimer A
+	default_isr_handler,			// Timer 1 subtimer B
+	default_isr_handler,			// Timer 2 subtimer A
+	default_isr_handler,			// Timer 2 subtimer B
+	default_isr_handler,			// Analog Comparator 0
+	default_isr_handler,			// Analog Comparator 1
+	default_isr_handler,			// Analog Comparator 2
+	default_isr_handler,			// System Control (PLL, OSC, BO)
+	default_isr_handler,			// FLASH Control
+	default_isr_handler,			// GPIO Port F
+	default_isr_handler,			// GPIO Port G
+	default_isr_handler,			// GPIO Port H
+	default_isr_handler,			// UART2 Rx and Tx
+	default_isr_handler,			// SSI1 Rx and Tx
+	default_isr_handler,			// Timer 3 subtimer A
+	default_isr_handler,			// Timer 3 subtimer B
+	default_isr_handler,			// I2C1 Master and Slave
+	default_isr_handler,			// Quadrature Encoder 1
+	default_isr_handler,			// CAN0
+	default_isr_handler,			// CAN1
+	0,								// Reserved
+	0,								// Reserved
+	default_isr_handler,			// Hibernate
+	default_isr_handler,			// USB0
+	default_isr_handler,			// PWM Generator 3
+	default_isr_handler,			// uDMA Software Transfer
+	default_isr_handler,			// uDMA Error
+	default_isr_handler,			// ADC1 Sequence 0
+	default_isr_handler,			// ADC1 Sequence 1
+	default_isr_handler,			// ADC1 Sequence 2
+	default_isr_handler,			// ADC1 Sequence 3
+	0,								// Reserved
+	0,								// Reserved
+	default_isr_handler,			// GPIO Port J
+	default_isr_handler,			// GPIO Port K
+	default_isr_handler,			// GPIO Port L
+	default_isr_handler,			// SSI2 Rx and Tx
+	default_isr_handler,			// SSI3 Rx and Tx
+	default_isr_handler,			// UART3 Rx and Tx
+	default_isr_handler,			// UART4 Rx and Tx
+	default_isr_handler,			// UART5 Rx and Tx
+	default_isr_handler,			// UART6 Rx and Tx
+	default_isr_handler,			// UART7 Rx and Tx
+	0,								// Reserved
+	0,								// Reserved
+	0,								// Reserved
+	0,								// Reserved
+	default_isr_handler,			// I2C2 Master and Slave
+	default_isr_handler,			// I2C3 Master and Slave
+	default_isr_handler,			// Timer 4 subtimer A
+	default_isr_handler,			// Timer 4 subtimer B
+	0,								// Reserved
+	0,								// Reserved
+	0,								// Reserved
+	0,								// Reserved
+	0,								// Reserved
+	0,								// Reserved
+	0,								// Reserved
+	0,								// Reserved
+	0,								// Reserved
+	0,								// Reserved
+	0,								// Reserved
+	0,								// Reserved
+	0,								// Reserved
+	0,								// Reserved
+	0,								// Reserved
+	0,								// Reserved
+	0,								// Reserved
+	0,								// Reserved
+	0,								// Reserved
+	0,								// Reserved
+	default_isr_handler,			// Timer 5 subtimer A
+	default_isr_handler,			// Timer 5 subtimer B
+	default_isr_handler,			// Wide Timer 0 subtimer A
+	default_isr_handler,			// Wide Timer 0 subtimer B
+	default_isr_handler,			// Wide Timer 1 subtimer A
+	default_isr_handler,			// Wide Timer 1 subtimer B
+	default_isr_handler,			// Wide Timer 2 subtimer A
+	default_isr_handler,			// Wide Timer 2 subtimer B
+	default_isr_handler,			// Wide Timer 3 subtimer A
+	default_isr_handler,			// Wide Timer 3 subtimer B
+	default_isr_handler,			// Wide Timer 4 subtimer A
+	default_isr_handler,			// Wide Timer 4 subtimer B
+	default_isr_handler,			// Wide Timer 5 subtimer A
+	default_isr_handler,			// Wide Timer 5 subtimer B
+	default_isr_handler,			// FPU
+	0,								// Reserved
+	0,								// Reserved
+	default_isr_handler,			// I2C4 Master and Slave
+	default_isr_handler,			// I2C5 Master and Slave
+	default_isr_handler,			// GPIO Port M
+	default_isr_handler,			// GPIO Port N
+	default_isr_handler,			// Quadrature Encoder 2
+	0,								// Reserved
+	0,								// Reserved
+	default_isr_handler,			// GPIO Port P (Summary or P0)
+	default_isr_handler,			// GPIO Port P1
+	default_isr_handler,			// GPIO Port P2
+	default_isr_handler,			// GPIO Port P3
+	default_isr_handler,			// GPIO Port P4
+	default_isr_handler,			// GPIO Port P5
+	default_isr_handler,			// GPIO Port P6
+	default_isr_handler,			// GPIO Port P7
+	default_isr_handler,			// GPIO Port Q (Summary or Q0)
+	default_isr_handler,			// GPIO Port Q1
+	default_isr_handler,			// GPIO Port Q2
+	default_isr_handler,			// GPIO Port Q3
+	default_isr_handler,			// GPIO Port Q4
+	default_isr_handler,			// GPIO Port Q5
+	default_isr_handler,			// GPIO Port Q6
+	default_isr_handler,			// GPIO Port Q7
+	default_isr_handler,			// GPIO Port R
+	default_isr_handler,			// GPIO Port S
+	default_isr_handler,			// PWM 1 Generator 0
+	default_isr_handler,			// PWM 1 Generator 1
+	default_isr_handler,			// PWM 1 Generator 2
+	default_isr_handler,			// PWM 1 Generator 3
+	default_isr_handler				// PWM 1 Fault
 };
 
 
@@ -242,10 +217,10 @@ __attribute__ ((section(".isr_handler")))
 void reset_isr_handler(void)
 {
 	/* Copy the data segment initializers from flash to SRAM. */
-	uint32_t * pui32Src = &__etext;
-	uint32_t * pui32Dest = &__data_start__;
-	for ( ; pui32Dest < &__data_end__; ) {
-		*pui32Dest++ = *pui32Src++;
+	uint32_t * data_load_addr = &__etext;
+	uint32_t * data_sram_addr = &__data_start__;
+	for ( ; data_sram_addr < &__data_end__; ) {
+		*data_sram_addr++ = *data_load_addr++;
 	}
 
 	/* Zero fill the bss segment. */
@@ -262,13 +237,14 @@ void reset_isr_handler(void)
 	/* Enable the floating-point unit. */
 	HWREG(0xE000ED88) = ((HWREG(0xE000ED88) & ~0x00F00000) | 0x00F00000);
 
-	// TODO: call sys_init
+	sys_init();
+
 	_mainCRTStartup();
 }
 
 
 __attribute__ ((section(".isr_handler")))
-static void NmiSR(void)
+static void nmi_isr_handler(void)
 {
 	while (1) {
 	}
@@ -276,7 +252,7 @@ static void NmiSR(void)
 
 
 __attribute__ ((section(".isr_handler")))
-static void FaultISR(void)
+static void fault_isr_handler(void)
 {
 	while (1) {
 	}
@@ -285,8 +261,13 @@ static void FaultISR(void)
 
 __attribute__ ((section(".isr_handler")))
 static void
-IntDefaultHandler(void)
+default_isr_handler(void)
 {
 	while (1) {
 	}
 }
+
+
+#pragma weak systick_isr_handler = default_isr_handler
+#pragma weak svc_isr_handler = default_isr_handler
+#pragma weak pendsv_isr_handler = default_isr_handler
