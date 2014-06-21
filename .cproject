@@ -54,7 +54,7 @@
 								</option>
 								<option id="com.ti.ccstudio.buildDefinitions.TMS470_GNU_4.0.compilerID.DEBUG.477604147" name="Generate debug information (-g)" superClass="com.ti.ccstudio.buildDefinitions.TMS470_GNU_4.0.compilerID.DEBUG" value="true" valueType="boolean"/>
 								<option id="com.ti.ccstudio.buildDefinitions.TMS470_GNU_4.0.compilerID.STRICT_DWARF.1520423178" name="Don't emit DWARF additions beyond selected version (-gstrict-dwarf)" superClass="com.ti.ccstudio.buildDefinitions.TMS470_GNU_4.0.compilerID.STRICT_DWARF" value="true" valueType="boolean"/>
-								<option id="com.ti.ccstudio.buildDefinitions.TMS470_GNU_4.0.compilerID.SPECS.933113405" name="Override built-in specs with the contents of the specified file (-specs)" superClass="com.ti.ccstudio.buildDefinitions.TMS470_GNU_4.0.compilerID.SPECS" value="&quot;nano.specs&quot;" valueType="string"/>
+								<option id="com.ti.ccstudio.buildDefinitions.TMS470_GNU_4.0.compilerID.SPECS.933113405" name="Override built-in specs with the contents of the specified file (-specs)" superClass="com.ti.ccstudio.buildDefinitions.TMS470_GNU_4.0.compilerID.SPECS" value="&quot;nano_mp.specs&quot;" valueType="string"/>
 								<option id="com.ti.ccstudio.buildDefinitions.TMS470_GNU_4.0.compilerID.OTHER_FLAGS.248561794" name="Other flags" superClass="com.ti.ccstudio.buildDefinitions.TMS470_GNU_4.0.compilerID.OTHER_FLAGS" valueType="stringList">
 									<listOptionValue builtIn="false" value="-std=gnu++11"/>
 								</option>
@@ -85,7 +85,7 @@
 						</toolChain>
 					</folderInfo>
 					<sourceEntries>
-						<entry excluding="third_party/freertos/portable/MemMang/heap_1.c|driverlib.lib|third_party/freertos/portable/CCS/ARM_CM4F/portasm.asm|third_party/freertos/portable/CCS/ARM_CM4F/port.c|src/tm4c123ge6pm_startup_ccs.c|tm4c123ge6pm_startup_ccs.c|tm4c123ge6pm.cmd|third_party/freertos/portable/MemMang/heap_4.c|third_party/freertos/portable/MemMang/heap_2.c" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
+						<entry excluding="third_party/freertos/portable/MemMang/heap_3.c|driverlib.lib|third_party/freertos/portable/CCS/ARM_CM4F/portasm.asm|third_party/freertos/portable/CCS/ARM_CM4F/port.c|src/tm4c123ge6pm_startup_ccs.c|tm4c123ge6pm_startup_ccs.c|tm4c123ge6pm.cmd|third_party/freertos/portable/MemMang/heap_4.c|third_party/freertos/portable/MemMang/heap_2.c" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
 					</sourceEntries>
 				</configuration>
 			</storageModule>
