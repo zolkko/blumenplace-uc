@@ -45,12 +45,12 @@ extern "C" {
 #define CCx_CHANNR							(0x0A)	/* Channel number */
 #define CCx_FSCTRL1							(0x0B)	/* Frequency synthesizer control */
 #define CCx_FSCTRL0							(0x0C)	/* Frequency synthesizer control */
-#define CCx_FREQ2							(0x0D)	/* Frequency control word, high unsigned char */
-#define CCx_FREQ1							(0x0E)	/* Frequency control word, middle unsigned char */
-#define CCx_FREQ0							(0x0F)	/* Frequency control word, low unsigned char */
-#define CCx_MDMCFG4							(0x10)	/* Modem configuration */
-#define CCx_MDMCFG3							(0x11)	/* Modem configuration */
-#define CCx_MDMCFG2							(0x12)	/* Modem configuration */
+// #define CCx_FREQ2							(0x0D)	/* Frequency control word, high unsigned char */
+// #define CCx_FREQ1							(0x0E)	/* Frequency control word, middle unsigned char */
+// #define CCx_FREQ0							(0x0F)	/* Frequency control word, low unsigned char */
+// #define CCx_MDMCFG4							(0x10)	/* Modem configuration */
+// #define CCx_MDMCFG3							(0x11)	/* Modem configuration */
+// #define CCx_MDMCFG2							(0x12)	/* Modem configuration */
 #define CCx_MDMCFG1							(0x13)	/* Modem configuration */
 #define CCx_MDMCFG0							(0x14)	/* Modem configuration */
 #define CCx_DEVIATN							(0x15)	/* Modem deviation setting */
@@ -281,7 +281,7 @@ extern "C" {
 #define CCx_FREQEST							(0x32 | 0xc0)
 #define CCx_LQI								(0x33 | 0xc0)
 #define CCx_RSSI							(0x34 | 0xc0)
-#define CCx_MARCSTATE						(0x35 | 0xc0)
+// #define CCx_MARCSTATE						(0x35 | 0xc0)
 #define CCx_WORTIME1						(0x36 | 0xc0)
 #define CCx_WORTIME0						(0x37 | 0xc0)
 #define CCx_PKTSTATUS						(0x38 | 0xc0)

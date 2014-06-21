@@ -24,13 +24,6 @@
 		<nature>org.eclipse.cdt.core.ccnature</nature>
 		<nature>org.eclipse.cdt.managedbuilder.core.ScannerConfigNature</nature>
 	</natures>
-	<linkedResources>
-		<link>
-			<name>driverlib.lib</name>
-			<type>1</type>
-			<locationURI>TIVAWARE_PATH/driverlib/ccs/Debug/driverlib.lib</locationURI>
-		</link>
-	</linkedResources>
 	<variableList>
 		<variable>
 			<name>FREERTOS_PATH</name>

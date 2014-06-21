@@ -32,6 +32,7 @@
 #include <driverlib/sysctl.h>
 #include <driverlib/gpio.h>
 #include <driverlib/ssi.h>
+#include <driverlib/interrupt.h>
 
 #include "gpio_pin.h"
 #include "ssi_dev.h"
