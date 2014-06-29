@@ -3,6 +3,7 @@
 	<name>blumenplace-uc</name>
 	<comment></comment>
 	<projects>
+		<project>driverlib</project>
 	</projects>
 	<buildSpec>
 		<buildCommand>
