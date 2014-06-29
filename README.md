@@ -60,3 +60,14 @@ make && make blumenplace.hex && make blumenplace.bin
 This command compiles and linkes blumenplace.elf application and generates hex and bin files
 which you can uploads to the device.
 
+
+## Importing project into QtCreator
+cmake allows to edit, build and debug the application using QtCreator IDE.
+In order to do this, you need to open the project as "CMake project file", and then
+type following arguments in Arguments field and press "Run CMake" button.
+```sh
+-DTOOLCHAIN_PATH=~/gcc-arm-none-eabi/bin -DCMAKE_TOOLCHAIN_FILE=~/projects/blumenplace-uc/tm4c123ge6pm.cmake
+```
+When it is done, QtCreator will show the project structure and from now on you
+can hit ```cmd-b``` to build the application.
+
