@@ -59,6 +59,7 @@
 									<listOptionValue builtIn="false" value="-std=gnu++11"/>
 								</option>
 								<option id="com.ti.ccstudio.buildDefinitions.TMS470_GNU_4.0.compilerID.MARCH.1549976662" name="Specify the name of the target architecture (-march)" superClass="com.ti.ccstudio.buildDefinitions.TMS470_GNU_4.0.compilerID.MARCH" value="armv7e-m" valueType="string"/>
+								<option id="com.ti.ccstudio.buildDefinitions.TMS470_GNU_4.0.compilerID.OPT_LEVEL.2094391092" name="Optimization Level" superClass="com.ti.ccstudio.buildDefinitions.TMS470_GNU_4.0.compilerID.OPT_LEVEL" value="com.ti.ccstudio.buildDefinitions.TMS470_GNU_4.0.compilerID.OPT_LEVEL.0" valueType="enumerated"/>
 								<inputType id="com.ti.ccstudio.buildDefinitions.TMS470_GNU_4.0.compiler.inputType__C_SRCS.1798656761" name="C Sources" superClass="com.ti.ccstudio.buildDefinitions.TMS470_GNU_4.0.compiler.inputType__C_SRCS"/>
 								<inputType id="com.ti.ccstudio.buildDefinitions.TMS470_GNU_4.0.compiler.inputType__CPP_SRCS.791611512" name="C++ Sources" superClass="com.ti.ccstudio.buildDefinitions.TMS470_GNU_4.0.compiler.inputType__CPP_SRCS"/>
 								<inputType id="com.ti.ccstudio.buildDefinitions.TMS470_GNU_4.0.compiler.inputType__ASM_SRCS.1136724077" name="Assembly Sources" superClass="com.ti.ccstudio.buildDefinitions.TMS470_GNU_4.0.compiler.inputType__ASM_SRCS"/>
@@ -75,7 +76,7 @@
 									<listOptionValue builtIn="false" value="stdc++"/>
 								</option>
 								<option id="com.ti.ccstudio.buildDefinitions.TMS470_GNU_4.0.linkerID.SEARCH_PATH.756186593" name="Library search path (-L, --library-path)" superClass="com.ti.ccstudio.buildDefinitions.TMS470_GNU_4.0.linkerID.SEARCH_PATH" valueType="stringList">
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/driverlib/Debug}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/third_party/tivaware}&quot;"/>
 								</option>
 								<inputType id="com.ti.ccstudio.buildDefinitions.TMS470_GNU_4.0.exeLinker.inputType__CMD_SRCS.1791951063" name="Linker Command Files" superClass="com.ti.ccstudio.buildDefinitions.TMS470_GNU_4.0.exeLinker.inputType__CMD_SRCS"/>
 								<inputType id="com.ti.ccstudio.buildDefinitions.TMS470_GNU_4.0.exeLinker.inputType__CMD2_SRCS.2043497309" name="Linker Command Files" superClass="com.ti.ccstudio.buildDefinitions.TMS470_GNU_4.0.exeLinker.inputType__CMD2_SRCS"/>
@@ -85,7 +86,7 @@
 						</toolChain>
 					</folderInfo>
 					<sourceEntries>
-						<entry excluding="third_party/freertos/portable/CCS/ARM_CM4F/tm4c123ge6pm.cmd|third_party/freertos/portable/CCS/ARM_CM4F/tm4c123ge6pm_startup_ccs.c|third_party/freertos/portable/MemMang/heap_1.c|third_party/freertos/portable/MemMang/heap_3.c|driverlib.lib|third_party/freertos/portable/CCS/ARM_CM4F/portasm.asm|third_party/freertos/portable/CCS/ARM_CM4F/port.c|src/tm4c123ge6pm_startup_ccs.c|tm4c123ge6pm_startup_ccs.c|tm4c123ge6pm.cmd|third_party/freertos/portable/MemMang/heap_4.c" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
+						<entry excluding="third_party/tivaware/ccs|third_party/tivaware/inc|third_party/tivaware/driverlib|third_party/freertos/portable/CCS/ARM_CM4F/tm4c123ge6pm.cmd|third_party/freertos/portable/CCS/ARM_CM4F/tm4c123ge6pm_startup_ccs.c|third_party/freertos/portable/MemMang/heap_1.c|third_party/freertos/portable/MemMang/heap_3.c|driverlib.lib|third_party/freertos/portable/CCS/ARM_CM4F/portasm.asm|third_party/freertos/portable/CCS/ARM_CM4F/port.c|src/tm4c123ge6pm_startup_ccs.c|tm4c123ge6pm_startup_ccs.c|tm4c123ge6pm.cmd|third_party/freertos/portable/MemMang/heap_4.c" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
 					</sourceEntries>
 				</configuration>
 			</storageModule>
