@@ -3,6 +3,7 @@
 	<name>blumenplace-uc</name>
 	<comment></comment>
 	<projects>
+		<project>driverlib</project>
 	</projects>
 	<buildSpec>
 		<buildCommand>
@@ -31,7 +32,7 @@
 		</variable>
 		<variable>
 			<name>TIVAWARE_PATH</name>
-			<value>file:/C:/ti/TivaWare_C_Series-2.0.1.11577</value>
+			<value>$%7BPROJECT_LOC%7D/third_party/tivaware</value>
 		</variable>
 	</variableList>
 </projectDescription>
