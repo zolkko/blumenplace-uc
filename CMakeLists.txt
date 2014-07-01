@@ -33,7 +33,7 @@ target_link_libraries(${PROJECT_NAME}.elf -lc)
 target_link_libraries(${PROJECT_NAME}.elf -lm)
 target_link_libraries(${PROJECT_NAME}.elf -lstdc++)
 target_link_libraries(${PROJECT_NAME}.elf -lgcc)
-target_link_libraries(${PROJECT_NAME}.elf -lrdimon)
+target_link_libraries(${PROJECT_NAME}.elf -lnosys)
 target_link_libraries(${PROJECT_NAME}.elf driverlib)
 
 add_custom_target(${PROJECT_NAME}.hex
